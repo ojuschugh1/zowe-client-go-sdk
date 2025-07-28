@@ -1,0 +1,33 @@
+{
+  "profiles": {
+    "zosmf": {
+      "default": {
+        "host": "mainframe.example.com",
+        "port": 443,
+        "user": "myuser",
+        "password": "mypassword",
+        "rejectUnauthorized": true,
+        "basePath": "/zosmf/api/v1"
+      },
+      "dev": {
+        "host": "dev-mainframe.example.com",
+        "port": 8080,
+        "user": "devuser",
+        "password": "devpassword",
+        "rejectUnauthorized": false,
+        "basePath": "/api/v1"
+      },
+      "test": {
+        "host": "test-mainframe.example.com",
+        "port": 8443,
+        "user": "testuser",
+        "password": "testpassword",
+        "rejectUnauthorized": true,
+        "basePath": ""
+      }
+    }
+  },
+  "default": {
+    "zosmf": "default"
+  }
+} 
