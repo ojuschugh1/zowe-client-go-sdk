@@ -2,6 +2,7 @@ package profile
 
 import (
 	"fmt"
+	"os"
 )
 
 // CreateZOSMFProfile creates a new ZOSMF profile with the given parameters
@@ -14,6 +15,7 @@ func CreateZOSMFProfile(name, host string, port int, user, password string) *ZOS
 		Password:           password,
 		RejectUnauthorized: true,
 		BasePath:           "",
+		Protocol:           "https",
 	}
 }
 
@@ -27,6 +29,7 @@ func CreateZOSMFProfileWithOptions(name, host string, port int, user, password s
 		Password:           password,
 		RejectUnauthorized: rejectUnauthorized,
 		BasePath:           basePath,
+		Protocol:           "https",
 	}
 }
 
@@ -85,5 +88,15 @@ func CloneProfile(profile *ZOSMFProfile) *ZOSMFProfile {
 		Password:           profile.Password,
 		RejectUnauthorized: profile.RejectUnauthorized,
 		BasePath:           profile.BasePath,
+		Protocol:           profile.Protocol,
+		Encoding:           profile.Encoding,
+		ResponseTimeout:    profile.ResponseTimeout,
+		CertFile:           profile.CertFile,
+		CertKeyFile:        profile.CertKeyFile,
 	}
+}
+
+// WriteTestConfig writes a test configuration to a file
+func WriteTestConfig(filename, content string) error {
+	return os.WriteFile(filename, []byte(content), 0644)
 } 
