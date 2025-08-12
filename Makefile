@@ -27,6 +27,10 @@ deps:
 run-example:
 	go run examples/profile_management.go
 
+# Run job management example
+run-job-example:
+	go run examples/job_management.go
+
 # Install the SDK
 install:
 	go install ./...

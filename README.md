@@ -7,13 +7,13 @@ A Go SDK for the Zowe framework that provides programmatic APIs to perform basic
 - **Profile Management**: Compatible with Zowe CLI configuration
 - **ZOSMF Profile Support**: Read and manage ZOSMF profiles
 - **Session Management**: Multiple sessions to the same mainframe with different users
+- **Job Management**: Complete z/OS job operations (submit, monitor, cancel, delete)
 - **Dataset Management**: CRUD operations for z/OS datasets (planned)
-- **Job Management**: z/OS job operations (planned)
 
 ## Installation
 
 ```bash
-go get github.com/zowe/zowe-client-go-sdk
+go get github.com/ojuschugh1/zowe-client-go-sdk
 ```
 
 ## Quick Start
@@ -25,7 +25,8 @@ import (
     "fmt"
     "log"
     
-    "github.com/zowe/zowe-client-go-sdk/pkg/profile"
+    "github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
+    "github.com/ojuschugh1/zowe-client-go-sdk/pkg/jobs"
 )
 
 func main() {
@@ -38,13 +39,20 @@ func main() {
         log.Fatal(err)
     }
     
-    // Create a session
-    session, err := zosmfProfile.CreateSession()
+    // Create a job manager
+    jm, err := jobs.NewJobManagerFromProfile(zosmfProfile)
     if err != nil {
         log.Fatal(err)
     }
     
-    fmt.Printf("Connected to %s as %s\n", session.Host, session.User)
+    // Submit a simple job
+    jcl := "//TESTJOB JOB (ACCT),'USER',MSGCLASS=A\n//STEP1 EXEC PGM=IEFBR14"
+    response, err := jm.SubmitJobStatement(jcl)
+    if err != nil {
+        log.Fatal(err)
+    }
+    
+    fmt.Printf("Job submitted: %s (%s)\n", response.JobName, response.JobID)
 }
 ```
 
