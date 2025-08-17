@@ -216,6 +216,16 @@ func demonstrateJobManagement(jm *jobs.ZOSMFJobManager) {
 	//     fmt.Printf("   Job completed with status: %s\n", status)
 	// }
 
+	// Example 17: Close job manager
+	fmt.Println("\n17. Closing job manager:")
+	err = jm.CloseJobManager()
+	if err != nil {
+		fmt.Printf("   Error closing job manager: %v\n", err)
+	} else {
+		fmt.Println("   Job manager closed successfully")
+		fmt.Println("   HTTP connections have been cleaned up")
+	}
+
 	fmt.Println("\nJob Management Examples Complete!")
 	fmt.Println("Note: Most operations require a connection to a real z/OS mainframe")
 	fmt.Println("The examples above demonstrate the API structure and usage patterns.")

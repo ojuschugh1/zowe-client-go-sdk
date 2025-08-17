@@ -106,6 +106,7 @@ type JobManager interface {
 	GetSpoolFiles(jobID string) ([]SpoolFile, error)
 	GetSpoolFileContent(jobID string, spoolID int) (string, error)
 	PurgeJob(jobID string) error
+	CloseJobManager() error
 }
 
 // ZOSMFJobManager implements JobManager for ZOSMF

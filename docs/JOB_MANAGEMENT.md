@@ -280,6 +280,28 @@ err := jm.DeleteJob("JOB001")
 
 // Purge a job (remove from system)
 err := jm.PurgeJob("JOB001")
+
+// Close job manager and clean up connections
+err := jm.CloseJobManager()
+```
+
+### Resource Management
+
+```go
+// Always close job managers when done to prevent memory leaks
+jm, err := jobs.CreateJobManagerDirect("mainframe.example.com", 443, "user", "pass")
+if err != nil {
+    log.Fatal(err)
+}
+defer jm.CloseJobManager()
+
+// Use the job manager
+response, err := jm.SubmitJobStatement("//TESTJOB JOB (ACCT),'USER',MSGCLASS=A")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Job manager will be automatically closed when function exits
 ```
 
 ### JCL Generation

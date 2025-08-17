@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 	"github.com/stretchr/testify/assert"
@@ -673,4 +674,377 @@ func TestGetJobsByStatus(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, jobList.Jobs, 1)
 	assert.Equal(t, "OUTPUT", jobList.Jobs[0].Status)
+}
+
+func TestCloseJobManager(t *testing.T) {
+	// Create a test session
+	profile := &profile.ZOSMFProfile{
+		Name:               "test",
+		Host:               "localhost",
+		Port:               8080,
+		User:               "testuser",
+		Password:           "testpass",
+		RejectUnauthorized: false,
+		BasePath:           "/api/v1",
+	}
+
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+
+	// Create job manager
+	jm := NewJobManager(session)
+	assert.NotNil(t, jm)
+
+	// Test closing the job manager
+	err = jm.CloseJobManager()
+	assert.NoError(t, err)
+}
+
+// Test error scenarios and edge cases
+func TestSubmitJobErrors(t *testing.T) {
+	// Create test server that returns errors
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error": "Invalid job request"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test submit job with no source specified
+	request := &SubmitJobRequest{}
+	_, err = jm.SubmitJob(request)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no job source specified")
+
+	// Test submit job with invalid request
+	request = &SubmitJobRequest{
+		JobStatement: "//TESTJOB JOB",
+	}
+	_, err = jm.SubmitJob(request)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "API request failed with status 400")
+}
+
+func TestGetJobErrors(t *testing.T) {
+	// Create test server that returns 404
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error": "Job not found"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test get non-existent job
+	_, err = jm.GetJob("NONEXISTENT")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "API request failed with status 404")
+}
+
+func TestCancelJobErrors(t *testing.T) {
+	// Create test server that returns 409 (conflict)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(`{"error": "Job cannot be cancelled"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test cancel job error
+	err = jm.CancelJob("JOB001")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "API request failed with status 409")
+}
+
+func TestDeleteJobErrors(t *testing.T) {
+	// Create test server that returns 403 (forbidden)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(`{"error": "Permission denied"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test delete job error
+	err = jm.DeleteJob("JOB001")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "API request failed with status 403")
+}
+
+func TestGetSpoolFilesErrors(t *testing.T) {
+	// Create test server that returns 500 (internal server error)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error": "Internal server error"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test get spool files error
+	_, err = jm.GetSpoolFiles("JOB001")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "API request failed with status 500")
+}
+
+func TestGetSpoolFileContentErrors(t *testing.T) {
+	// Create test server that returns 404
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error": "Spool file not found"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test get spool file content error
+	_, err = jm.GetSpoolFileContent("JOB001", 999)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "API request failed with status 404")
+}
+
+func TestPurgeJobErrors(t *testing.T) {
+	// Create test server that returns 400
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"error": "Cannot purge job"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test purge job error
+	err = jm.PurgeJob("JOB001")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "API request failed with status 400")
+}
+
+func TestWaitForJobCompletionTimeout(t *testing.T) {
+	// Create test server that always returns running status
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		response := Job{
+			JobID:   "JOB001",
+			JobName: "TESTJOB",
+			Status:  "RUNNING",
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test timeout scenario
+	_, err = jm.WaitForJobCompletion("JOB001", 100*time.Millisecond, 50*time.Millisecond)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "timeout waiting for job")
+}
+
+func TestWaitForJobCompletionError(t *testing.T) {
+	// Create test server that returns error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error": "Job not found"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test error during wait
+	_, err = jm.WaitForJobCompletion("JOB001", 1*time.Second, 100*time.Millisecond)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "failed to get job status")
+}
+
+func TestSubmitJobWithAllSources(t *testing.T) {
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "POST", r.Method)
+		assert.Equal(t, "/api/v1/jobs", r.URL.Path)
+		
+		// Parse request body
+		var requestBody map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&requestBody)
+		
+		response := SubmitJobResponse{
+			JobID:   "JOB001",
+			JobName: "TESTJOB",
+			Owner:   "testuser",
+			Status:  "INPUT",
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test submit job with dataset
+	request := &SubmitJobRequest{
+		JobDataSet: "TEST.JCL",
+		Volume:     "VOL001",
+	}
+	response, err := jm.SubmitJob(request)
+	require.NoError(t, err)
+	assert.Equal(t, "JOB001", response.JobID)
+
+	// Test submit job with local file
+	request = &SubmitJobRequest{
+		JobLocalFile: "test.jcl",
+		Directory:    "/tmp",
+		Extension:    "jcl",
+	}
+	response, err = jm.SubmitJob(request)
+	require.NoError(t, err)
+	assert.Equal(t, "JOB001", response.JobID)
+}
+
+func TestListJobsWithAllFilters(t *testing.T) {
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/api/v1/jobs", r.URL.Path)
+		
+		// Check all query parameters
+		assert.Equal(t, "testuser", r.URL.Query().Get("owner"))
+		assert.Equal(t, "TEST", r.URL.Query().Get("prefix"))
+		assert.Equal(t, "10", r.URL.Query().Get("max-jobs"))
+		assert.Equal(t, "JOB001", r.URL.Query().Get("jobid"))
+		assert.Equal(t, "TESTJOB", r.URL.Query().Get("jobname"))
+		assert.Equal(t, "OUTPUT", r.URL.Query().Get("status"))
+		assert.Equal(t, "CORRELATOR", r.URL.Query().Get("user-correlator"))
+		
+		response := JobList{
+			Jobs: []Job{
+				{
+					JobID:   "JOB001",
+					JobName: "TESTJOB",
+					Owner:   "testuser",
+					Status:  "OUTPUT",
+				},
+			},
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test with all filters
+	filter := &JobFilter{
+		Owner:           "testuser",
+		Prefix:          "TEST",
+		MaxJobs:         10,
+		JobID:           "JOB001",
+		JobName:         "TESTJOB",
+		Status:          "OUTPUT",
+		UserCorrelator:  "CORRELATOR",
+	}
+	
+	jobList, err := jm.ListJobs(filter)
+	require.NoError(t, err)
+	assert.Len(t, jobList.Jobs, 1)
+	assert.Equal(t, "JOB001", jobList.Jobs[0].JobID)
+}
+
+func TestGetJobInfo(t *testing.T) {
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "GET", r.Method)
+		assert.Equal(t, "/api/v1/jobs/JOB001/files", r.URL.Path)
+		
+		response := JobInfo{
+			JobID:   "JOB001",
+			JobName: "TESTJOB",
+			Owner:   "testuser",
+			Status:  "OUTPUT",
+		}
+		
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(response)
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test get job info
+	jobInfo, err := jm.GetJobInfo("JOB001")
+	require.NoError(t, err)
+	assert.Equal(t, "JOB001", jobInfo.JobID)
+	assert.Equal(t, "TESTJOB", jobInfo.JobName)
+}
+
+func TestGetJobInfoError(t *testing.T) {
+	// Create test server that returns error
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(`{"error": "Job info not found"}`))
+	}))
+	defer server.Close()
+
+	// Create job manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	jm := NewJobManager(session)
+
+	// Test get job info error
+	_, err = jm.GetJobInfo("JOB001")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "API request failed with status 404")
 }

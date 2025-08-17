@@ -12,6 +12,15 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
+// API endpoint constants
+const (
+	JobsEndpoint     = "/jobs"
+	FilesEndpoint    = "/files"
+	CancelEndpoint   = "/cancel"
+	PurgeEndpoint    = "/purge"
+	RecordsEndpoint  = "/records"
+)
+
 // NewJobManager creates a new job manager using a session
 func NewJobManager(session *profile.Session) *ZOSMFJobManager {
 	return &ZOSMFJobManager{
@@ -59,7 +68,7 @@ func (jm *ZOSMFJobManager) ListJobs(filter *JobFilter) (*JobList, error) {
 	}
 
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs"
+	apiURL := session.GetBaseURL() + JobsEndpoint
 	if len(params) > 0 {
 		apiURL += "?" + params.Encode()
 	}
@@ -102,7 +111,7 @@ func (jm *ZOSMFJobManager) GetJob(jobID string) (*Job, error) {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs/" + url.PathEscape(jobID)
+	apiURL := session.GetBaseURL() + JobsEndpoint + "/" + url.PathEscape(jobID)
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -142,7 +151,7 @@ func (jm *ZOSMFJobManager) GetJobInfo(jobID string) (*JobInfo, error) {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs/" + url.PathEscape(jobID) + "/files"
+	apiURL := session.GetBaseURL() + JobsEndpoint + "/" + url.PathEscape(jobID) + FilesEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -191,7 +200,7 @@ func (jm *ZOSMFJobManager) SubmitJob(request *SubmitJobRequest) (*SubmitJobRespo
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs"
+	apiURL := session.GetBaseURL() + JobsEndpoint
 
 	// Prepare request body
 	var requestBody interface{}
@@ -267,7 +276,7 @@ func (jm *ZOSMFJobManager) CancelJob(jobID string) error {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs/" + url.PathEscape(jobID) + "/cancel"
+	apiURL := session.GetBaseURL() + JobsEndpoint + "/" + url.PathEscape(jobID) + CancelEndpoint
 
 	// Create request
 	req, err := http.NewRequest("PUT", apiURL, nil)
@@ -301,7 +310,7 @@ func (jm *ZOSMFJobManager) DeleteJob(jobID string) error {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs/" + url.PathEscape(jobID)
+	apiURL := session.GetBaseURL() + JobsEndpoint + "/" + url.PathEscape(jobID)
 
 	// Create request
 	req, err := http.NewRequest("DELETE", apiURL, nil)
@@ -335,7 +344,7 @@ func (jm *ZOSMFJobManager) GetSpoolFiles(jobID string) ([]SpoolFile, error) {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs/" + url.PathEscape(jobID) + "/files"
+	apiURL := session.GetBaseURL() + JobsEndpoint + "/" + url.PathEscape(jobID) + FilesEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -375,7 +384,7 @@ func (jm *ZOSMFJobManager) GetSpoolFileContent(jobID string, spoolID int) (strin
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs/" + url.PathEscape(jobID) + "/files/" + strconv.Itoa(spoolID) + "/records"
+	apiURL := session.GetBaseURL() + JobsEndpoint + "/" + url.PathEscape(jobID) + FilesEndpoint + "/" + strconv.Itoa(spoolID) + RecordsEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -415,7 +424,7 @@ func (jm *ZOSMFJobManager) PurgeJob(jobID string) error {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + "/jobs/" + url.PathEscape(jobID) + "/purge"
+	apiURL := session.GetBaseURL() + JobsEndpoint + "/" + url.PathEscape(jobID) + PurgeEndpoint
 
 	// Create request
 	req, err := http.NewRequest("PUT", apiURL, nil)
@@ -441,5 +450,17 @@ func (jm *ZOSMFJobManager) PurgeJob(jobID string) error {
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
+	return nil
+}
+
+// CloseJobManager closes the job manager and its underlying HTTP connections
+func (jm *ZOSMFJobManager) CloseJobManager() error {
+	session := jm.session.(*profile.Session)
+	
+	// Close idle connections in the HTTP client
+	if client := session.GetHTTPClient(); client != nil {
+		client.CloseIdleConnections()
+	}
+	
 	return nil
 }
