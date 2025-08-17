@@ -67,3 +67,11 @@ dev-setup: deps
 run-with-sample:
 	cp examples/sample_zowe_config.json ~/.zowe/zowe.config.json
 	go run examples/profile_management.go 
+
+# Run dataset management example
+run-dataset-example:
+	@echo "Running Dataset Management Example..."
+	@go run examples/dataset_management.go
+
+# Run all examples
+run-all-examples: run-example run-job-example run-dataset-example 
