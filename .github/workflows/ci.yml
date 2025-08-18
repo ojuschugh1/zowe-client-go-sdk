@@ -35,14 +35,25 @@ jobs:
       - name: Run unit tests (SDK packages)
         run: go test -v ./pkg/...
 
-      - name: Tidy integration module
-        run: |
-          cd integration
-          go mod tidy
+      # Integration tests are in a separate repository
+      # Uncomment when integration test repository is available
+      # - name: Tidy integration module
+      #   run: |
+      #     cd integration
+      #     go mod tidy
+      # 
+      # - name: Run integration tests
+      #   run: |
+      #     cd integration
+      #     go test -v ./...
 
-      - name: Run integration tests
-        run: |
-          cd integration
-          go test -v ./...
+      - name: Run zXplore integration test (if credentials available)
+        if: env.ZXPLORE_HOST != ''
+        env:
+          ZXPLORE_HOST: ${{ secrets.ZXPLORE_HOST }}
+          ZXPLORE_PORT: ${{ secrets.ZXPLORE_PORT }}
+          ZXPLORE_USER: ${{ secrets.ZXPLORE_USER }}
+          ZXPLORE_PASSWORD: ${{ secrets.ZXPLORE_PASSWORD }}
+        run: go run test_zxplore_github.go
 
 
