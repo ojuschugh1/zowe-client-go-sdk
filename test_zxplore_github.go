@@ -7,7 +7,6 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
