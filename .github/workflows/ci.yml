@@ -35,17 +35,16 @@ jobs:
       - name: Run unit tests (SDK packages)
         run: go test -v ./pkg/...
 
-      # Integration tests are in a separate repository
-      # Uncomment when integration test repository is available
-      # - name: Tidy integration module
-      #   run: |
-      #     cd integration
-      #     go mod tidy
-      # 
-      # - name: Run integration tests
-      #   run: |
-      #     cd integration
-      #     go test -v ./...
+      # Integration tests (enabled on integration-tests branch)
+      - name: Tidy integration module
+        run: |
+          cd integration
+          go mod tidy
+
+      - name: Run integration tests
+        run: |
+          cd integration
+          go test -v ./...
 
       - name: Run zXplore integration test (if credentials available)
         if: env.ZXPLORE_HOST != ''

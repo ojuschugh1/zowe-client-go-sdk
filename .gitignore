@@ -63,8 +63,8 @@ setup_zxplore_test.ps1
 # Local configuration files with credentials
 zowe.config.json
 
-# Integration test folder (separate repo)
-integration/
+# Integration test folder (excluded on main branch, included on integration-tests branch)
+# integration/
 
 # Temporary files
 *.tmp
