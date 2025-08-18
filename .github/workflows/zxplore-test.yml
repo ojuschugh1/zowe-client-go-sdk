@@ -1,0 +1,27 @@
+name: zXplore Integration Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Test zXplore Integration
+      env:
+        ZXPLORE_HOST: ${{ secrets.ZXPLORE_HOST }}
+        ZXPLORE_PORT: ${{ secrets.ZXPLORE_PORT }}
+        ZXPLORE_USER: ${{ secrets.ZXPLORE_USER }}
+        ZXPLORE_PASSWORD: ${{ secrets.ZXPLORE_PASSWORD }}
+      run: go run test_zxplore_github.go

@@ -47,6 +47,25 @@ Thumbs.db
 .env
 .env.local
 
+# Sensitive test files (contain hardcoded credentials)
+test_zxplore.go
+test_zxplore_diagnostic.go
+test_zxplore_working.go
+test_zxplore_web_verify.go
+test_zxplore_auth_debug.go
+test_zxplore_correct_apis.go
+test_zxplore_final.go
+
+# Local setup scripts
+setup_zxplore_test.bat
+setup_zxplore_test.ps1
+
+# Local configuration files with credentials
+zowe.config.json
+
+# Integration test folder (separate repo)
+integration/
+
 # Temporary files
-tmp/
-temp/ 
+*.tmp
+*.temp 
