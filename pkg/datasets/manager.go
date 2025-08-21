@@ -12,9 +12,9 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// API endpoint constants
+// API endpoint constants aligned to z/OSMF dataset APIs
 const (
-	DatasetsEndpoint = "/datasets"
+	DatasetsEndpoint = "/restfiles/ds"
 	MembersEndpoint  = "/members"
 	ContentEndpoint  = "/content"
 )
@@ -44,6 +44,7 @@ func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList
 	if filter != nil {
 		if filter.Name != "" {
 			params.Set("dsname", filter.Name)
+			params.Set("dslevel", filter.Name)
 		}
 		if filter.Type != "" {
 			params.Set("dsorg", filter.Type)

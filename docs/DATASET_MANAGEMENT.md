@@ -85,8 +85,8 @@ dm, err := datasets.NewDatasetManagerFromProfile(zosmfProfile)
 // Direct connection
 dm, err := datasets.CreateDatasetManagerDirect("mainframe.example.com", 443, "user", "pass")
 
-// With additional options
-dm, err := datasets.CreateDatasetManagerDirectWithOptions("mainframe.example.com", 443, "user", "pass", false, "/api/v1")
+// With additional options (BasePath defaults to /zosmf if omitted)
+dm, err := datasets.CreateDatasetManagerDirectWithOptions("mainframe.example.com", 443, "user", "pass", false, "")
 ```
 
 ## API Reference

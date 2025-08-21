@@ -14,9 +14,9 @@ The job management system consists of the following key components:
 
 ## Features
 
-- ✅ Submit jobs using JCL statements
-- ✅ Submit jobs from datasets
-- ✅ Submit jobs from local files
+- ✅ Submit jobs using JCL statements (via PUT)
+- ✅ Submit jobs from datasets (via PUT)
+- ✅ Submit jobs from local files (via PUT)
 - ✅ List jobs with filtering options
 - ✅ Get detailed job information
 - ✅ Monitor job status
@@ -83,8 +83,8 @@ jm, err := jobs.NewJobManagerFromProfile(zosmfProfile)
 // Direct connection
 jm, err := jobs.CreateJobManagerDirect("mainframe.example.com", 443, "user", "pass")
 
-// With additional options
-jm, err := jobs.CreateJobManagerDirectWithOptions("mainframe.example.com", 443, "user", "pass", false, "/api/v1")
+// With additional options (BasePath defaults to /zosmf if omitted)
+jm, err := jobs.CreateJobManagerDirectWithOptions("mainframe.example.com", 443, "user", "pass", false, "")
 ```
 
 ## API Reference
@@ -168,11 +168,13 @@ type JobFilter struct {
 - `CreateJobManagerDirect(host string, port int, user, password string) (*ZOSMFJobManager, error)`
 - `CreateJobManagerDirectWithOptions(host string, port int, user, password string, rejectUnauthorized bool, basePath string) (*ZOSMFJobManager, error)`
 
-#### Job Operations
+#### Job Operations (z/OSMF /restjobs)
 - `ListJobs(filter *JobFilter) (*JobList, error)`
 - `GetJob(jobID string) (*Job, error)`
 - `GetJobInfo(jobID string) (*JobInfo, error)`
 - `GetJobStatus(jobID string) (string, error)`
+- `GetJobByNameID(jobName, jobID string) (*Job, error)`
+- `GetJobByCorrelator(correlator string) (*Job, error)`
 - `SubmitJob(request *SubmitJobRequest) (*SubmitJobResponse, error)`
 - `CancelJob(jobID string) error`
 - `DeleteJob(jobID string) error`
@@ -244,10 +246,13 @@ jobList, err := jm.GetJobsByStatus("OUTPUT", 20)
 
 ```go
 // Get job status
-status, err := jm.GetJobStatus("JOB001")
+status, err := jm.GetJobStatus("<correlator>")
 
-// Get detailed job information
-job, err := jm.GetJob("JOB001")
+// Get detailed job information by correlator
+job, err := jm.GetJob("<correlator>")
+
+// Or get by job name and id
+job, err := jm.GetJobByNameID("JOBNAME", "JOB001")
 
 // Wait for job completion
 status, err := jm.WaitForJobCompletion("JOB001", 5*time.Minute, 10*time.Second)

@@ -2,6 +2,7 @@ package profile
 
 import (
 	"crypto/tls"
+	"encoding/base64"
 	"fmt"
 	"net/http"
 	"time"
@@ -38,15 +39,26 @@ func (p *ZOSMFProfile) NewSession() (*Session, error) {
 	if p.Port != 0 && p.Port != 80 && p.Port != 443 {
 		baseURL += ":" + fmt.Sprintf("%d", p.Port)
 	}
-	
-	if p.BasePath != "" {
-		baseURL += p.BasePath
+
+	// Default BasePath to /zosmf if not specified
+	basePath := p.BasePath
+	if basePath == "" {
+		basePath = "/zosmf"
 	}
+	// Ensure leading slash
+	if basePath[0] != '/' {
+		basePath = "/" + basePath
+	}
+	baseURL += basePath
 	
 	// Set default headers
 	headers := map[string]string{
 		"Content-Type": "application/json",
 		"Accept":       "application/json",
+	}
+	if p.User != "" && p.Password != "" {
+		b := base64.StdEncoding.EncodeToString([]byte(p.User + ":" + p.Password))
+		headers["Authorization"] = "Basic " + b
 	}
 	
 	return &Session{
