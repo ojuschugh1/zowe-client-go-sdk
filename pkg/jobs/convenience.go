@@ -71,17 +71,17 @@ func (jm *ZOSMFJobManager) SubmitJobFromLocalFile(localFile, directory, extensio
 }
 
 // WaitForJobCompletion waits for a job to complete and returns the final status
-func (jm *ZOSMFJobManager) WaitForJobCompletion(jobID string, timeout time.Duration, pollInterval time.Duration) (string, error) {
+func (jm *ZOSMFJobManager) WaitForJobCompletion(correlator string, timeout time.Duration, pollInterval time.Duration) (string, error) {
 	startTime := time.Now()
 	
 	for {
 		// Check if timeout exceeded
 		if time.Since(startTime) > timeout {
-			return "", fmt.Errorf("timeout waiting for job %s to complete", jobID)
+			return "", fmt.Errorf("timeout waiting for job %s to complete", correlator)
 		}
 
 		// Get job status
-		status, err := jm.GetJobStatus(jobID)
+		status, err := jm.GetJobStatus(correlator)
 		if err != nil {
 			return "", fmt.Errorf("failed to get job status: %w", err)
 		}
@@ -137,9 +137,9 @@ func (jm *ZOSMFJobManager) GetJobsByStatus(status string, maxJobs int) (*JobList
 }
 
 // GetJobOutput retrieves the output of a completed job
-func (jm *ZOSMFJobManager) GetJobOutput(jobID string) (map[string]string, error) {
+func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, error) {
 	// Get spool files
-	spoolFiles, err := jm.GetSpoolFiles(jobID)
+	spoolFiles, err := jm.GetSpoolFiles(correlator)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get spool files: %w", err)
 	}
@@ -147,7 +147,7 @@ func (jm *ZOSMFJobManager) GetJobOutput(jobID string) (map[string]string, error)
 	// Get content for each spool file
 	output := make(map[string]string)
 	for _, spoolFile := range spoolFiles {
-		content, err := jm.GetSpoolFileContent(jobID, spoolFile.ID)
+		content, err := jm.GetSpoolFileContent(correlator, spoolFile.ID)
 		if err != nil {
 			// Log error but continue with other files
 			continue
@@ -159,9 +159,9 @@ func (jm *ZOSMFJobManager) GetJobOutput(jobID string) (map[string]string, error)
 }
 
 // GetJobOutputByDDName retrieves the output of a specific DD name for a job
-func (jm *ZOSMFJobManager) GetJobOutputByDDName(jobID, ddName string) (string, error) {
+func (jm *ZOSMFJobManager) GetJobOutputByDDName(correlator, ddName string) (string, error) {
 	// Get spool files
-	spoolFiles, err := jm.GetSpoolFiles(jobID)
+	spoolFiles, err := jm.GetSpoolFiles(correlator)
 	if err != nil {
 		return "", fmt.Errorf("failed to get spool files: %w", err)
 	}
@@ -169,7 +169,7 @@ func (jm *ZOSMFJobManager) GetJobOutputByDDName(jobID, ddName string) (string, e
 	// Find the spool file with the specified DD name
 	for _, spoolFile := range spoolFiles {
 		if spoolFile.DDName == ddName {
-			content, err := jm.GetSpoolFileContent(jobID, spoolFile.ID)
+			content, err := jm.GetSpoolFileContent(correlator, spoolFile.ID)
 			if err != nil {
 				return "", fmt.Errorf("failed to get content for DD %s: %w", ddName, err)
 			}
@@ -177,7 +177,7 @@ func (jm *ZOSMFJobManager) GetJobOutputByDDName(jobID, ddName string) (string, e
 		}
 	}
 
-	return "", fmt.Errorf("DD name %s not found for job %s", ddName, jobID)
+	return "", fmt.Errorf("DD name %s not found for job %s", ddName, correlator)
 }
 
 // ValidateJobRequest validates a job submission request

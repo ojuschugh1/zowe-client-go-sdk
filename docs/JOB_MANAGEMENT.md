@@ -27,6 +27,27 @@ The job management system consists of the following key components:
 - ✅ Job validation and JCL generation
 - ✅ Comprehensive error handling
 
+## Implementation Details
+
+### HTTP Methods
+- **Job Submission**: Uses PUT method as per IBM z/OSMF documentation
+- **Job Cancellation**: Uses PUT method
+- **Job Deletion**: Uses DELETE method
+- **Job Retrieval**: Uses GET method
+
+### Endpoint Templates
+The SDK uses proper endpoint templates for consistent URL construction:
+- Jobs collection: `/restjobs/jobs`
+- Job by name and ID: `/restjobs/jobs/{jobname}/{jobid}`
+- Job by correlator: `/restjobs/jobs/{correlator}`
+- Spool files: `/restjobs/jobs/{correlator}/files`
+- Spool file content: `/restjobs/jobs/{correlator}/files/{spoolid}/records`
+
+### Parameter Naming
+- **correlator**: Used for most job operations (recommended for API consistency)
+- **jobName + jobID**: Used specifically for `GetJobByNameID` operations
+- The `GetJob` function accepts a correlator parameter for consistency with IBM documentation
+
 ## Quick Start
 
 ### Basic Usage
@@ -170,30 +191,30 @@ type JobFilter struct {
 
 #### Job Operations (z/OSMF /restjobs)
 - `ListJobs(filter *JobFilter) (*JobList, error)`
-- `GetJob(jobID string) (*Job, error)`
-- `GetJobInfo(jobID string) (*JobInfo, error)`
-- `GetJobStatus(jobID string) (string, error)`
-- `GetJobByNameID(jobName, jobID string) (*Job, error)`
-- `GetJobByCorrelator(correlator string) (*Job, error)`
+- `GetJob(correlator string) (*Job, error)` - Get job by correlator (recommended)
+- `GetJobInfo(correlator string) (*JobInfo, error)`
+- `GetJobStatus(correlator string) (string, error)`
+- `GetJobByNameID(jobName, jobID string) (*Job, error)` - Get job by name and ID
+- `GetJobByCorrelator(correlator string) (*Job, error)` - Get job by correlator
 - `SubmitJob(request *SubmitJobRequest) (*SubmitJobResponse, error)`
-- `CancelJob(jobID string) error`
-- `DeleteJob(jobID string) error`
-- `PurgeJob(jobID string) error`
+- `CancelJob(correlator string) error`
+- `DeleteJob(correlator string) error`
+- `PurgeJob(correlator string) error`
 
 #### Spool File Operations
-- `GetSpoolFiles(jobID string) ([]SpoolFile, error)`
-- `GetSpoolFileContent(jobID string, spoolID int) (string, error)`
+- `GetSpoolFiles(correlator string) ([]SpoolFile, error)`
+- `GetSpoolFileContent(correlator string, spoolID int) (string, error)`
 
 #### Convenience Functions
 - `SubmitJobStatement(jclStatement string) (*SubmitJobResponse, error)`
 - `SubmitJobFromDataset(dataset string, volume string) (*SubmitJobResponse, error)`
 - `SubmitJobFromLocalFile(localFile, directory, extension string) (*SubmitJobResponse, error)`
-- `WaitForJobCompletion(jobID string, timeout time.Duration, pollInterval time.Duration) (string, error)`
+- `WaitForJobCompletion(correlator string, timeout time.Duration, pollInterval time.Duration) (string, error)`
 - `GetJobsByOwner(owner string, maxJobs int) (*JobList, error)`
 - `GetJobsByPrefix(prefix string, maxJobs int) (*JobList, error)`
 - `GetJobsByStatus(status string, maxJobs int) (*JobList, error)`
-- `GetJobOutput(jobID string) (map[string]string, error)`
-- `GetJobOutputByDDName(jobID, ddName string) (string, error)`
+- `GetJobOutput(correlator string) (map[string]string, error)`
+- `GetJobOutputByDDName(correlator, ddName string) (string, error)`
 
 #### JCL Generation
 - `CreateSimpleJobStatement(jobName, account, user, msgClass, msgLevel string) string`

@@ -26,6 +26,11 @@ const (
 	CancelEndpoint  = "/cancel"
 	PurgeEndpoint   = "/purge"
 	RecordsEndpoint = "/records"
+	
+	// File-specific endpoints
+	JobFilesEndpoint        = "/files"
+	JobFilesByIDEndpoint    = "/files/%s/records"
+	JobFilesJCLEndpoint     = "/files/JCL/records"
 )
 
 // NewJobManager creates a new job manager using a session
@@ -122,12 +127,12 @@ func (jm *ZOSMFJobManager) ListJobs(filter *JobFilter) (*JobList, error) {
 	return nil, fmt.Errorf("failed to decode response: %s", string(bodyBytes))
 }
 
-// GetJob retrieves detailed information about a specific job
-func (jm *ZOSMFJobManager) GetJob(jobID string) (*Job, error) {
+// GetJob retrieves detailed information about a specific job by correlator
+func (jm *ZOSMFJobManager) GetJob(correlator string) (*Job, error) {
 	session := jm.session.(*profile.Session)
 	
-	// Build URL (treat provided id as correlator for back-compat)
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(jobID))
+	// Build URL using correlator
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator))
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -163,11 +168,11 @@ func (jm *ZOSMFJobManager) GetJob(jobID string) (*Job, error) {
 }
 
 // GetJobInfo retrieves job information
-func (jm *ZOSMFJobManager) GetJobInfo(jobID string) (*JobInfo, error) {
+func (jm *ZOSMFJobManager) GetJobInfo(correlator string) (*JobInfo, error) {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(jobID)) + FilesEndpoint
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + JobFilesEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -203,8 +208,8 @@ func (jm *ZOSMFJobManager) GetJobInfo(jobID string) (*JobInfo, error) {
 }
 
 // GetJobStatus retrieves the status of a job
-func (jm *ZOSMFJobManager) GetJobStatus(jobID string) (string, error) {
-	job, err := jm.GetJob(jobID)
+func (jm *ZOSMFJobManager) GetJobStatus(correlator string) (string, error) {
+	job, err := jm.GetJob(correlator)
 	if err != nil {
 		return "", err
 	}
@@ -344,11 +349,11 @@ func (jm *ZOSMFJobManager) SubmitJob(request *SubmitJobRequest) (*SubmitJobRespo
 }
 
 // CancelJob cancels a running job
-func (jm *ZOSMFJobManager) CancelJob(jobID string) error {
+func (jm *ZOSMFJobManager) CancelJob(correlator string) error {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(jobID)) + CancelEndpoint
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + CancelEndpoint
 
 	// Create request
 	req, err := http.NewRequest("PUT", apiURL, nil)
@@ -378,11 +383,11 @@ func (jm *ZOSMFJobManager) CancelJob(jobID string) error {
 }
 
 // DeleteJob deletes a job
-func (jm *ZOSMFJobManager) DeleteJob(jobID string) error {
+func (jm *ZOSMFJobManager) DeleteJob(correlator string) error {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(jobID))
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator))
 
 	// Create request
 	req, err := http.NewRequest("DELETE", apiURL, nil)
@@ -412,11 +417,11 @@ func (jm *ZOSMFJobManager) DeleteJob(jobID string) error {
 }
 
 // GetSpoolFiles retrieves spool files for a job
-func (jm *ZOSMFJobManager) GetSpoolFiles(jobID string) ([]SpoolFile, error) {
+func (jm *ZOSMFJobManager) GetSpoolFiles(correlator string) ([]SpoolFile, error) {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(jobID)) + FilesEndpoint
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + JobFilesEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -452,11 +457,11 @@ func (jm *ZOSMFJobManager) GetSpoolFiles(jobID string) ([]SpoolFile, error) {
 }
 
 // GetSpoolFileContent retrieves the content of a specific spool file
-func (jm *ZOSMFJobManager) GetSpoolFileContent(jobID string, spoolID int) (string, error) {
+func (jm *ZOSMFJobManager) GetSpoolFileContent(correlator string, spoolID int) (string, error) {
 	session := jm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(jobID)) + "/files/" + strconv.Itoa(spoolID) + RecordsEndpoint
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + fmt.Sprintf(JobFilesByIDEndpoint, strconv.Itoa(spoolID))
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -492,11 +497,11 @@ func (jm *ZOSMFJobManager) GetSpoolFileContent(jobID string, spoolID int) (strin
 }
 
 // PurgeJob purges a job (removes it from the system)
-func (jm *ZOSMFJobManager) PurgeJob(jobID string) error {
+func (jm *ZOSMFJobManager) PurgeJob(correlator string) error {
 	session := jm.session.(*profile.Session)
 	
 	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(jobID)) + PurgeEndpoint
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + PurgeEndpoint
 
 	// Create request
 	req, err := http.NewRequest("PUT", apiURL, nil)
