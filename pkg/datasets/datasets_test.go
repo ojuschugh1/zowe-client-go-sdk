@@ -97,7 +97,7 @@ func TestListDatasets(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/datasets", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
 		
 		// Return mock response
 		response := DatasetList{
@@ -135,7 +135,7 @@ func TestGetDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.DATA", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
 		
 		// Return mock response
 		response := Dataset{
@@ -167,7 +167,7 @@ func TestCreateDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/datasets", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -209,7 +209,7 @@ func TestDeleteDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.DATA", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
 		
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -230,7 +230,7 @@ func TestUploadContent(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.DATA/content", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA/content", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -267,7 +267,7 @@ func TestDownloadContent(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.DATA/content", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA/content", r.URL.Path)
 		
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte("Hello, World!"))
@@ -295,7 +295,7 @@ func TestListMembers(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.PDS/members", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/members", r.URL.Path)
 		
 		// Return mock response
 		response := MemberList{
@@ -331,7 +331,7 @@ func TestGetMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.PDS/members/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/members/MEMBER1", r.URL.Path)
 		
 		// Return mock response
 		response := DatasetMember{
@@ -361,7 +361,7 @@ func TestDeleteMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.PDS/members/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/members/MEMBER1", r.URL.Path)
 		
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -382,7 +382,7 @@ func TestExists(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.DATA", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
 		
 		// Return mock response
 		response := Dataset{
@@ -411,7 +411,7 @@ func TestCopyDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/datasets/SOURCE.DATA/copy", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/SOURCE.DATA/copy", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -439,7 +439,7 @@ func TestRenameDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)
-		assert.Equal(t, "/api/v1/datasets/OLD.DATA/rename", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/OLD.DATA/rename", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -492,7 +492,7 @@ func TestCreateSequentialDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/datasets", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -527,7 +527,7 @@ func TestCreatePartitionedDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/datasets", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -563,7 +563,7 @@ func TestUploadText(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.DATA/content", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA/content", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -593,7 +593,7 @@ func TestUploadTextToMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.PDS/content/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/content/MEMBER1", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -623,7 +623,7 @@ func TestDownloadText(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.DATA/content", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA/content", r.URL.Path)
 		assert.Equal(t, "UTF-8", r.URL.Query().Get("encoding"))
 		
 		w.Header().Set("Content-Type", "text/plain")
@@ -647,7 +647,7 @@ func TestDownloadTextFromMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/datasets/TEST.PDS/content/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/content/MEMBER1", r.URL.Path)
 		assert.Equal(t, "UTF-8", r.URL.Query().Get("encoding"))
 		
 		w.Header().Set("Content-Type", "text/plain")

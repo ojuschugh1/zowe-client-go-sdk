@@ -246,7 +246,7 @@ func TestCreateSessionDirect(t *testing.T) {
 	assert.Equal(t, 443, session.Port)
 	assert.Equal(t, "user", session.User)
 	assert.Equal(t, "pass", session.Password)
-	assert.Equal(t, "https://localhost", session.BaseURL)
+	assert.Equal(t, "https://localhost/zosmf", session.BaseURL)
 }
 
 func TestCreateSessionDirectWithOptions(t *testing.T) {
@@ -428,7 +428,7 @@ func TestSessionWithDifferentProtocols(t *testing.T) {
 				Host: "localhost",
 				Port: 443,
 			},
-			expected: "https://localhost",
+			expected: "https://localhost/zosmf",
 		},
 		{
 			name: "http port 80",
@@ -436,7 +436,7 @@ func TestSessionWithDifferentProtocols(t *testing.T) {
 				Host: "localhost",
 				Port: 80,
 			},
-			expected: "http://localhost",
+			expected: "http://localhost/zosmf",
 		},
 		{
 			name: "http port 8080",
@@ -444,7 +444,7 @@ func TestSessionWithDifferentProtocols(t *testing.T) {
 				Host: "localhost",
 				Port: 8080,
 			},
-			expected: "http://localhost:8080",
+			expected: "http://localhost:8080/zosmf",
 		},
 		{
 			name: "custom port",
@@ -452,7 +452,7 @@ func TestSessionWithDifferentProtocols(t *testing.T) {
 				Host: "localhost",
 				Port: 8443,
 			},
-			expected: "https://localhost:8443",
+			expected: "https://localhost:8443/zosmf",
 		},
 		{
 			name: "explicit protocol",
@@ -461,7 +461,7 @@ func TestSessionWithDifferentProtocols(t *testing.T) {
 				Port:     443,
 				Protocol: "http",
 			},
-			expected: "http://localhost",
+			expected: "http://localhost/zosmf",
 		},
 	}
 

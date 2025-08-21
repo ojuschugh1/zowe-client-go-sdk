@@ -100,6 +100,8 @@ type JobManager interface {
 	GetJob(jobID string) (*Job, error)
 	GetJobInfo(jobID string) (*JobInfo, error)
 	GetJobStatus(jobID string) (string, error)
+	GetJobByNameID(jobName, jobID string) (*Job, error)
+	GetJobByCorrelator(correlator string) (*Job, error)
 	SubmitJob(request *SubmitJobRequest) (*SubmitJobResponse, error)
 	CancelJob(jobID string) error
 	DeleteJob(jobID string) error
