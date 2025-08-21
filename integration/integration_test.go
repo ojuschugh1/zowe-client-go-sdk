@@ -26,7 +26,7 @@ func newMockZosmfServer() *httptest.Server {
 	mux := http.NewServeMux()
 
 	// Jobs: list & submit & get & files & records & cancel/delete/purge
-	mux.HandleFunc("/api/v1/jobs", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/restjobs/jobs", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			// return all jobs
 			out := jobs.JobList{Jobs: []jobs.Job{}}
@@ -36,7 +36,7 @@ func newMockZosmfServer() *httptest.Server {
 			_ = json.NewEncoder(w).Encode(out)
 			return
 		}
-		if r.Method == http.MethodPost {
+		if r.Method == http.MethodPut {
 			var body map[string]any
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			id := fmt.Sprintf("JOB%08d", len(jobsState)+1)
@@ -50,8 +50,8 @@ func newMockZosmfServer() *httptest.Server {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	})
 
-	mux.HandleFunc("/api/v1/jobs/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path[len("/api/v1/jobs/"):]
+	mux.HandleFunc("/api/v1/restjobs/jobs/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path[len("/api/v1/restjobs/jobs/"):]
 		// /{id}
 		if r.Method == http.MethodGet && len(path) > 0 && !strings.Contains(path, "/") {
 			// exact id match for get
@@ -93,7 +93,7 @@ func newMockZosmfServer() *httptest.Server {
 	})
 
 	// Datasets minimal endpoints
-	mux.HandleFunc("/api/v1/datasets", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("/api/v1/restfiles/ds", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodGet {
 			_ = json.NewEncoder(w).Encode(datasets.DatasetList{Datasets: []datasets.Dataset{}, Returned: 0, Total: 0})
 			return
@@ -105,8 +105,8 @@ func newMockZosmfServer() *httptest.Server {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	})
 
-	mux.HandleFunc("/api/v1/datasets/", func(w http.ResponseWriter, r *http.Request) {
-		path := r.URL.Path[len("/api/v1/datasets/"):]
+	mux.HandleFunc("/api/v1/restfiles/ds/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path[len("/api/v1/restfiles/ds/"):]
 		// content endpoints first to avoid matching generic dataset GET
 		if len(path) > 0 && len(path) >= len("/content") && path[len(path)-len("/content"): ] == "/content" {
 			if r.Method == http.MethodPost {
