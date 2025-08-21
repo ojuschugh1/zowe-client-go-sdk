@@ -12,11 +12,24 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// API endpoint constants aligned to z/OSMF dataset APIs
+// API endpoint constants and templates aligned to z/OSMF dataset APIs
 const (
+	// Collection endpoints
 	DatasetsEndpoint = "/restfiles/ds"
+	
+	// Resource templates
+	DatasetByNameEndpoint = "/restfiles/ds/%s"
+	
+	// Sub-resources
 	MembersEndpoint  = "/members"
 	ContentEndpoint  = "/content"
+	
+	// Member-specific endpoints
+	MemberByNameEndpoint = "/members/%s"
+	
+	// Content endpoints
+	DatasetContentEndpoint = "/content"
+	MemberContentEndpoint  = "/content/%s"
 )
 
 // NewDatasetManager creates a new dataset manager using a session
@@ -103,8 +116,8 @@ func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList
 func (dm *ZOSMFDatasetManager) GetDataset(name string) (*Dataset, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(name)
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(name))
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -215,8 +228,8 @@ func (dm *ZOSMFDatasetManager) CreateDataset(request *CreateDatasetRequest) erro
 func (dm *ZOSMFDatasetManager) DeleteDataset(name string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(name)
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(name))
 
 	// Create request
 	req, err := http.NewRequest("DELETE", apiURL, nil)
@@ -249,8 +262,8 @@ func (dm *ZOSMFDatasetManager) DeleteDataset(name string) error {
 func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(request.DatasetName) + ContentEndpoint
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
 	if request.MemberName != "" {
 		apiURL += "/" + url.PathEscape(request.MemberName)
 	}
@@ -304,8 +317,8 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 func (dm *ZOSMFDatasetManager) DownloadContent(request *DownloadRequest) (string, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(request.DatasetName) + ContentEndpoint
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
 	if request.MemberName != "" {
 		apiURL += "/" + url.PathEscape(request.MemberName)
 	}
@@ -356,8 +369,8 @@ func (dm *ZOSMFDatasetManager) DownloadContent(request *DownloadRequest) (string
 func (dm *ZOSMFDatasetManager) ListMembers(datasetName string) (*MemberList, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(datasetName) + MembersEndpoint
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(datasetName)) + MembersEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -396,8 +409,8 @@ func (dm *ZOSMFDatasetManager) ListMembers(datasetName string) (*MemberList, err
 func (dm *ZOSMFDatasetManager) GetMember(datasetName, memberName string) (*DatasetMember, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(datasetName) + MembersEndpoint + "/" + url.PathEscape(memberName)
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(datasetName)) + MembersEndpoint + "/" + url.PathEscape(memberName)
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -436,8 +449,8 @@ func (dm *ZOSMFDatasetManager) GetMember(datasetName, memberName string) (*Datas
 func (dm *ZOSMFDatasetManager) DeleteMember(datasetName, memberName string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(datasetName) + MembersEndpoint + "/" + url.PathEscape(memberName)
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(datasetName)) + MembersEndpoint + "/" + url.PathEscape(memberName)
 
 	// Create request
 	req, err := http.NewRequest("DELETE", apiURL, nil)
@@ -483,8 +496,8 @@ func (dm *ZOSMFDatasetManager) Exists(name string) (bool, error) {
 func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(sourceName) + "/copy"
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(sourceName)) + "/copy"
 
 	// Prepare request body
 	requestBody := map[string]string{
@@ -529,8 +542,8 @@ func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error 
 func (dm *ZOSMFDatasetManager) RenameDataset(oldName, newName string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint + "/" + url.PathEscape(oldName) + "/rename"
+	// Build URL using template
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(oldName)) + "/rename"
 
 	// Prepare request body
 	requestBody := map[string]string{
