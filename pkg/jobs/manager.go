@@ -279,44 +279,50 @@ func (jm *ZOSMFJobManager) SubmitJob(request *SubmitJobRequest) (*SubmitJobRespo
 	// Build URL
 	apiURL := session.GetBaseURL() + JobsEndpoint
 
-	// Prepare request body
-	var requestBody interface{}
+	// Prepare request body and content type based on submission type
+	var requestBody []byte
+	var contentType string
+	var err error
+	
 	if request.JobStatement != "" {
-		// Submit job statement
-		requestBody = map[string]string{
-			"jobStatement": request.JobStatement,
-		}
+		// Submit job statement as plain text (z/OSMF expects JCL as text/plain for direct submission)
+		requestBody = []byte(request.JobStatement)
+		contentType = "text/plain"
 	} else if request.JobDataSet != "" {
-		// Submit job from dataset
-		requestBody = map[string]string{
-			"jobDataSet": request.JobDataSet,
+		// Submit job from dataset using JSON format
+		body := map[string]interface{}{
+			"file": request.JobDataSet,
 		}
 		if request.Volume != "" {
-			requestBody.(map[string]string)["volume"] = request.Volume
+			body["volume"] = request.Volume
 		}
+		requestBody, err = json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal dataset job request: %w", err)
+		}
+		contentType = "application/json"
 	} else if request.JobLocalFile != "" {
-		// Submit job from local file
-		requestBody = map[string]string{
-			"jobLocalFile": request.JobLocalFile,
+		// Submit job from local file using JSON format
+		body := map[string]interface{}{
+			"file": request.JobLocalFile,
 		}
 		if request.Directory != "" {
-			requestBody.(map[string]string)["directory"] = request.Directory
+			body["directory"] = request.Directory
 		}
 		if request.Extension != "" {
-			requestBody.(map[string]string)["extension"] = request.Extension
+			body["extension"] = request.Extension
 		}
+		requestBody, err = json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal local file job request: %w", err)
+		}
+		contentType = "application/json"
 	} else {
 		return nil, fmt.Errorf("no job source specified (jobStatement, jobDataSet, or jobLocalFile)")
 	}
 
-	// Serialize request body
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
 	// Create request (use PUT per z/OSMF documentation)
-	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -325,6 +331,7 @@ func (jm *ZOSMFJobManager) SubmitJob(request *SubmitJobRequest) (*SubmitJobRespo
 	for key, value := range session.GetHeaders() {
 		req.Header.Set(key, value)
 	}
+	req.Header.Set("Content-Type", contentType)
 
 	// Make request
 	resp, err := session.GetHTTPClient().Do(req)
@@ -382,12 +389,23 @@ func (jm *ZOSMFJobManager) CancelJob(correlator string) error {
 	return nil
 }
 
-// DeleteJob deletes a job
+// DeleteJob deletes a job using correlator format (jobname:jobid)
 func (jm *ZOSMFJobManager) DeleteJob(correlator string) error {
+	// Parse correlator to get jobname and jobid
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return fmt.Errorf("invalid correlator format: %w", err)
+	}
+	
+	return jm.DeleteJobByNameID(jobName, jobID)
+}
+
+// DeleteJobByNameID deletes a job using separate jobName and jobID
+func (jm *ZOSMFJobManager) DeleteJobByNameID(jobName, jobID string) error {
 	session := jm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator))
+	// Build URL using jobName and jobID format
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByNameIDEndpoint, url.PathEscape(jobName), url.PathEscape(jobID))
 
 	// Create request
 	req, err := http.NewRequest("DELETE", apiURL, nil)

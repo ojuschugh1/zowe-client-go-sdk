@@ -54,14 +54,20 @@ func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList
 	
 	// Build query parameters according to z/OSMF API documentation
 	params := url.Values{}
+	
+	// z/OSMF requires either dslevel or volser parameter - provide default if none specified
+	hasRequiredParam := false
+	
 	if filter != nil {
 		if filter.Name != "" {
 			// Use dslevel parameter for dataset name pattern (supports wildcards)
 			params.Set("dslevel", filter.Name)
+			hasRequiredParam = true
 		}
 		if filter.Volume != "" {
 			// Use volser parameter for volume serial
 			params.Set("volser", filter.Volume)
+			hasRequiredParam = true
 		}
 		if filter.Owner != "" {
 			// Use start parameter for pagination (dataset name to start from)
@@ -69,6 +75,12 @@ func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList
 		}
 		// Note: Limit is handled via X-IBM-Max-Items header, not query parameter
 		// Note: Type/dsorg filtering is not supported in z/OSMF list datasets API
+	}
+	
+	// If no required parameter (dslevel or volser) is provided, use a user-specific pattern
+	if !hasRequiredParam {
+		// Use the user ID from the session as default pattern to avoid overly broad searches
+		params.Set("dslevel", session.User+".*") // List datasets starting with user ID
 	}
 
 	// Build URL

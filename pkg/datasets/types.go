@@ -4,10 +4,10 @@ package datasets
 type DatasetType string
 
 const (
-	DatasetTypeSequential DatasetType = "SEQ"
-	DatasetTypePartitioned DatasetType = "PO"
-	DatasetTypePDSE       DatasetType = "PDSE"
-	DatasetTypeVSAM       DatasetType = "VSAM"
+	DatasetTypeSequential DatasetType = "PS"   // Physical Sequential
+	DatasetTypePartitioned DatasetType = "PO"  // Partitioned Organization
+	DatasetTypePDSE       DatasetType = "PDSE" // Partitioned Dataset Extended
+	DatasetTypeVSAM       DatasetType = "VSAM" // Virtual Storage Access Method
 )
 
 // SpaceUnit represents the unit for space allocation
