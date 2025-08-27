@@ -318,7 +318,7 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 	defer resp.Body.Close()
 
 	// Check response status
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
