@@ -99,18 +99,17 @@ func TestListDatasets(t *testing.T) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
 		
-		// Return mock response
+		// Return mock response matching z/OSMF API format
 		response := DatasetList{
 			Datasets: []Dataset{
 				{
 					Name: "TEST.DATA",
-					Type: DatasetTypeSequential,
-					Size: 1024,
-					Used: 512,
+					Type: "PS",
+					Used: "512",
 				},
 			},
-			Returned: 1,
-			Total:    1,
+			ReturnedRows: 1,
+			JSONVersion:  1,
 		}
 		
 		w.Header().Set("Content-Type", "application/json")
@@ -135,14 +134,20 @@ func TestGetDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
+		// GetDataset now uses the list API with a filter
 		
-		// Return mock response
-		response := Dataset{
-			Name: "TEST.DATA",
-			Type: DatasetTypeSequential,
-			Size: 1024,
-			Used: 512,
+		// Return mock response matching z/OSMF API format
+		response := DatasetList{
+			Datasets: []Dataset{
+				{
+					Name: "TEST.DATA",
+					Type: "PS",
+					Used: "512",
+				},
+			},
+			ReturnedRows: 1,
+			JSONVersion:  1,
 		}
 		
 		w.Header().Set("Content-Type", "application/json")
@@ -160,7 +165,7 @@ func TestGetDataset(t *testing.T) {
 	dataset, err := dm.GetDataset("TEST.DATA")
 	require.NoError(t, err)
 	assert.Equal(t, "TEST.DATA", dataset.Name)
-	assert.Equal(t, DatasetTypeSequential, dataset.Type)
+	assert.Equal(t, "PS", dataset.Type)
 }
 
 func TestCreateDataset(t *testing.T) {
@@ -295,18 +300,17 @@ func TestListMembers(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/members", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/member", r.URL.Path)
 		
-		// Return mock response
+		// Return mock response matching z/OSMF API format
 		response := MemberList{
 			Members: []DatasetMember{
 				{
 					Name: "MEMBER1",
-					Size: 256,
 				},
 			},
-			Returned: 1,
-			Total:    1,
+			ReturnedRows: 1,
+			JSONVersion:  1,
 		}
 		
 		w.Header().Set("Content-Type", "application/json")
@@ -331,12 +335,11 @@ func TestGetMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/members/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/member/MEMBER1", r.URL.Path)
 		
-		// Return mock response
+		// Return mock response matching z/OSMF API format
 		response := DatasetMember{
 			Name: "MEMBER1",
-			Size: 256,
 		}
 		
 		w.Header().Set("Content-Type", "application/json")
@@ -354,14 +357,13 @@ func TestGetMember(t *testing.T) {
 	member, err := dm.GetMember("TEST.PDS", "MEMBER1")
 	require.NoError(t, err)
 	assert.Equal(t, "MEMBER1", member.Name)
-	assert.Equal(t, int64(256), member.Size)
 }
 
 func TestDeleteMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/members/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/member/MEMBER1", r.URL.Path)
 		
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -382,12 +384,18 @@ func TestExists(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
 		
-		// Return mock response
-		response := Dataset{
-			Name: "TEST.DATA",
-			Type: DatasetTypeSequential,
+		// Return mock response matching z/OSMF API format
+		response := DatasetList{
+			Datasets: []Dataset{
+				{
+					Name: "TEST.DATA",
+					Type: "PS",
+				},
+			},
+			ReturnedRows: 1,
+			JSONVersion:  1,
 		}
 		
 		w.Header().Set("Content-Type", "application/json")
