@@ -53,9 +53,9 @@ func (dm *ZOSMFDatasetManager) CreateSequentialDataset(name string) error {
 			Secondary: 5,
 			Unit:      SpaceUnitTracks,
 		},
-		RecordFormat: RecordFormatFixed,
-		RecordLength: RecordLength80,
-		BlockSize:    BlockSize800,
+		RecordFormat: RecordFormatVariable,
+		RecordLength: RecordLength256,
+		BlockSize:    BlockSize27920,
 	}
 	return dm.CreateDataset(request)
 }
@@ -71,9 +71,9 @@ func (dm *ZOSMFDatasetManager) CreatePartitionedDataset(name string) error {
 			Unit:      SpaceUnitTracks,
 			Directory: 5,
 		},
-		RecordFormat: RecordFormatFixed,
-		RecordLength: RecordLength80,
-		BlockSize:    BlockSize800,
+		RecordFormat: RecordFormatVariable,
+		RecordLength: RecordLength256,
+		BlockSize:    BlockSize27920,
 		Directory:    5,
 	}
 	return dm.CreateDataset(request)

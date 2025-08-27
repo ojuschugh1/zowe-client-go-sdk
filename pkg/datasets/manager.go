@@ -275,8 +275,8 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 		// For members, use dataset(member) format
 		apiURL = session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(request.DatasetName), url.PathEscape(request.MemberName))
 	} else {
-		// For datasets, use the standard endpoint
-		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
+		// For datasets, use the dataset endpoint directly (no /content suffix)
+		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName))
 	}
 
 	var req *http.Request
@@ -286,24 +286,8 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 		// For members, use PUT with plain text content
 		req, err = http.NewRequest("PUT", apiURL, bytes.NewBufferString(request.Content))
 	} else {
-		// For datasets, use POST with JSON (original behavior)
-		requestBody := map[string]interface{}{
-			"content": request.Content,
-		}
-		if request.Encoding != "" {
-			requestBody["encoding"] = request.Encoding
-		}
-		if request.Replace {
-			requestBody["replace"] = true
-		}
-
-		// Serialize request body
-		jsonBody, err := json.Marshal(requestBody)
-		if err != nil {
-			return fmt.Errorf("failed to marshal request body: %w", err)
-		}
-
-		req, err = http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
+		// For datasets, use PUT with plain text content (per z/OSMF API specification)
+		req, err = http.NewRequest("PUT", apiURL, bytes.NewBufferString(request.Content))
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -314,13 +298,8 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 		req.Header.Set(key, value)
 	}
 	
-	if request.MemberName != "" {
-		// For members, use plain text content type
-		req.Header.Set("Content-Type", "text/plain")
-	} else {
-		// For datasets, use JSON content type
-		req.Header.Set("Content-Type", "application/json")
-	}
+	// For both datasets and members, use plain text content type (per z/OSMF API specification)
+	req.Header.Set("Content-Type", "text/plain")
 
 	// Make request
 	resp, err := session.GetHTTPClient().Do(req)
@@ -348,8 +327,8 @@ func (dm *ZOSMFDatasetManager) DownloadContent(request *DownloadRequest) (string
 		// For members, use dataset(member) format
 		apiURL = session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(request.DatasetName), url.PathEscape(request.MemberName))
 	} else {
-		// For datasets, use the standard endpoint
-		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
+		// For datasets, use the dataset endpoint directly (no /content suffix)
+		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName))
 	}
 
 	// Add query parameters
