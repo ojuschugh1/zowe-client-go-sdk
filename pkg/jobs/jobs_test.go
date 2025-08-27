@@ -2,6 +2,7 @@ package jobs
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -155,7 +156,7 @@ func TestGetJob(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restjobs/jobs/JOB001", r.URL.Path)
+		assert.Equal(t, "/api/v1/restjobs/jobs/TESTJOB1/JOB001", r.URL.Path)
 		
 		// Return mock response
 		job := Job{
@@ -180,7 +181,7 @@ func TestGetJob(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get job
-	job, err := jm.GetJob("JOB001")
+	job, err := jm.GetJob("TESTJOB1:JOB001")
 	require.NoError(t, err)
 	assert.Equal(t, "JOB001", job.JobID)
 	assert.Equal(t, "TESTJOB1", job.JobName)
@@ -193,7 +194,7 @@ func TestGetJobStatus(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restjobs/jobs/JOB001", r.URL.Path)
+		assert.Equal(t, "/api/v1/restjobs/jobs/TESTJOB1/JOB001", r.URL.Path)
 		
 		// Return mock response
 		job := Job{
@@ -217,7 +218,7 @@ func TestGetJobStatus(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get job status
-	status, err := jm.GetJobStatus("JOB001")
+	status, err := jm.GetJobStatus("TESTJOB1:JOB001")
 	require.NoError(t, err)
 	assert.Equal(t, "OUTPUT", status)
 }
@@ -228,10 +229,10 @@ func TestSubmitJob(t *testing.T) {
 		assert.Equal(t, "PUT", r.Method)
 		assert.Equal(t, "/api/v1/restjobs/jobs", r.URL.Path)
 		
-		// Parse request body
-		var requestBody map[string]string
-		json.NewDecoder(r.Body).Decode(&requestBody)
-		assert.Equal(t, "//TESTJOB JOB (ACCT),'USER',MSGCLASS=A", requestBody["jobStatement"])
+		// Parse request body (should be plain text for JCL)
+		body, _ := io.ReadAll(r.Body)
+		assert.Equal(t, "//TESTJOB JOB (ACCT),'USER',MSGCLASS=A", string(body))
+		assert.Equal(t, "text/plain", r.Header.Get("Content-Type"))
 		
 		// Return mock response
 		response := SubmitJobResponse{
@@ -363,7 +364,7 @@ func TestDeleteJob(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "/api/v1/restjobs/jobs/JOB001", r.URL.Path)
+		assert.Equal(t, "/api/v1/restjobs/jobs/TESTJOB1/JOB001", r.URL.Path)
 		
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -378,7 +379,7 @@ func TestDeleteJob(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test delete job
-	err = jm.DeleteJob("JOB001")
+	err = jm.DeleteJob("TESTJOB1:JOB001")
 	require.NoError(t, err)
 }
 
@@ -745,7 +746,7 @@ func TestGetJobErrors(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get non-existent job
-	_, err = jm.GetJob("NONEXISTENT")
+	_, err = jm.GetJob("NONEXISTENT:JOB999")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "API request failed with status 404")
 }
@@ -785,7 +786,7 @@ func TestDeleteJobErrors(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test delete job error
-	err = jm.DeleteJob("JOB001")
+	err = jm.DeleteJob("TESTJOB1:JOB001")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "API request failed with status 403")
 }
@@ -870,7 +871,7 @@ func TestWaitForJobCompletionTimeout(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test timeout scenario
-	_, err = jm.WaitForJobCompletion("JOB001", 100*time.Millisecond, 50*time.Millisecond)
+	_, err = jm.WaitForJobCompletion("TESTJOB1:JOB001", 100*time.Millisecond, 50*time.Millisecond)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "timeout waiting for job")
 }
@@ -890,7 +891,7 @@ func TestWaitForJobCompletionError(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test error during wait
-	_, err = jm.WaitForJobCompletion("JOB001", 1*time.Second, 100*time.Millisecond)
+	_, err = jm.WaitForJobCompletion("TESTJOB1:JOB001", 1*time.Second, 100*time.Millisecond)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to get job status")
 }
@@ -1002,7 +1003,7 @@ func TestGetJobInfo(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restjobs/jobs/JOB001/files", r.URL.Path)
+		assert.Equal(t, "/api/v1/restjobs/jobs/TESTJOB1/JOB001/files", r.URL.Path)
 		
 		response := JobInfo{
 			JobID:   "JOB001",
@@ -1023,7 +1024,7 @@ func TestGetJobInfo(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get job info
-	jobInfo, err := jm.GetJobInfo("JOB001")
+	jobInfo, err := jm.GetJobInfo("TESTJOB1:JOB001")
 	require.NoError(t, err)
 	assert.Equal(t, "JOB001", jobInfo.JobID)
 	assert.Equal(t, "TESTJOB", jobInfo.JobName)
@@ -1044,7 +1045,7 @@ func TestGetJobInfoError(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get job info error
-	_, err = jm.GetJobInfo("JOB001")
+	_, err = jm.GetJobInfo("TESTJOB1:JOB001")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "API request failed with status 404")
 }

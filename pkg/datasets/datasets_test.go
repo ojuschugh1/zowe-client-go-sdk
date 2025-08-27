@@ -181,7 +181,7 @@ func TestCreateDataset(t *testing.T) {
 		
 		// Verify request body
 		assert.Equal(t, "TEST.DATA", requestBody["dsname"])
-		assert.Equal(t, "SEQ", requestBody["dsorg"])
+		assert.Equal(t, "PS", requestBody["dsorg"])
 		
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -513,7 +513,7 @@ func TestCreateSequentialDataset(t *testing.T) {
 		
 		// Verify request body
 		assert.Equal(t, "TEST.SEQ", requestBody["dsname"])
-		assert.Equal(t, "SEQ", requestBody["dsorg"])
+		assert.Equal(t, "PS", requestBody["dsorg"])
 		assert.Equal(t, "TRK", requestBody["alcunit"])
 		assert.Equal(t, float64(10), requestBody["primary"])
 		assert.Equal(t, float64(5), requestBody["secondary"])
