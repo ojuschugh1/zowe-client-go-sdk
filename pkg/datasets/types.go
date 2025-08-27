@@ -144,6 +144,7 @@ type DatasetManager interface {
 	// Basic operations
 	ListDatasets(filter *DatasetFilter) (*DatasetList, error)
 	GetDataset(name string) (*Dataset, error)
+	GetDatasetInfo(name string) (*Dataset, error)
 	CreateDataset(request *CreateDatasetRequest) error
 	DeleteDataset(name string) error
 	

@@ -158,6 +158,70 @@ func (dm *ZOSMFDatasetManager) GetDataset(name string) (*Dataset, error) {
 	return nil, fmt.Errorf("dataset not found: %s", name)
 }
 
+// GetDatasetInfo retrieves detailed information about a specific dataset
+// This method first tries the direct API call, and if that fails, falls back to the list API approach
+func (dm *ZOSMFDatasetManager) GetDatasetInfo(name string) (*Dataset, error) {
+	// First try the direct API approach
+	dataset, err := dm.getDatasetInfoDirect(name)
+	if err == nil {
+		return dataset, nil
+	}
+	
+	// If direct API fails, fall back to the existing GetDataset method
+	// which uses the list API with a filter
+	return dm.GetDataset(name)
+}
+
+// getDatasetInfoDirect attempts to retrieve dataset info using direct API call
+// This is a private method that may not work in all z/OSMF environments
+func (dm *ZOSMFDatasetManager) getDatasetInfoDirect(name string) (*Dataset, error) {
+	session := dm.session.(*profile.Session)
+	
+	// Build URL for direct dataset info retrieval
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(name))
+	
+	// Add query parameter to request metadata instead of content
+	params := url.Values{}
+	params.Set("metadata", "true")
+	apiURL += "?" + params.Encode()
+
+	// Create request
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add headers
+	for key, value := range session.GetHeaders() {
+		req.Header.Set(key, value)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	// Make request
+	resp, err := session.GetHTTPClient().Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("dataset not found: %s", name)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Try to parse response body as JSON
+	var dataset Dataset
+	if err := json.NewDecoder(resp.Body).Decode(&dataset); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &dataset, nil
+}
+
 // CreateDataset creates a new dataset using the correct z/OSMF REST API format
 // Based on IBM documentation: POST /zosmf/restfiles/ds/<data-set-name>
 func (dm *ZOSMFDatasetManager) CreateDataset(request *CreateDatasetRequest) error {
