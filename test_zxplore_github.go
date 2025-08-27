@@ -64,11 +64,18 @@ func main() {
 
 	// Datasets check: list datasets (best-effort)
 	fmt.Println("Listing datasets (best-effort)...")
-	dl, err := dm.ListDatasets(&datasets.DatasetFilter{Name: user + ".*", Limit: 5})
+	dl, err := dm.ListDatasets(&datasets.DatasetFilter{Name: user + ".*", Limit: 10})
 	if err != nil {
 		fmt.Printf("Datasets list error: %v\n", err)
 	} else {
 		fmt.Printf("Datasets returned: %d\n", len(dl.Datasets))
+		// Print first few dataset names for verification
+		for i, ds := range dl.Datasets {
+			if i >= 3 { // Show only first 3
+				break
+			}
+			fmt.Printf("  Dataset %d: %s\n", i+1, ds.Name)
+		}
 	}
 
 	// Close managers

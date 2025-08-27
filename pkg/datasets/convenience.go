@@ -138,9 +138,11 @@ func (dm *ZOSMFDatasetManager) DownloadTextFromMember(datasetName, memberName st
 }
 
 // GetDatasetsByOwner gets datasets owned by a specific user
+// Note: z/OSMF API doesn't support owner filtering directly, so we use name pattern
 func (dm *ZOSMFDatasetManager) GetDatasetsByOwner(owner string, limit int) (*DatasetList, error) {
+	// Use the owner as a high-level qualifier pattern (common convention)
 	filter := &DatasetFilter{
-		Owner: owner,
+		Name:  owner + ".*",
 		Limit: limit,
 	}
 	return dm.ListDatasets(filter)

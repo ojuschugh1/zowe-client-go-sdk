@@ -1,9 +1,5 @@
 package datasets
 
-import (
-	"time"
-)
-
 // DatasetType represents the type of dataset
 type DatasetType string
 
@@ -54,25 +50,28 @@ const (
 	BlockSize32760 BlockSize = 32760
 )
 
-// Dataset represents a z/OS dataset
+// Dataset represents a z/OS dataset with fields matching z/OSMF API response
 type Dataset struct {
-	Name         string      `json:"name"`
-	Type         DatasetType `json:"type"`
-	Volume       string      `json:"volume,omitempty"`
-	Space        Space       `json:"space,omitempty"`
-	RecordFormat RecordFormat `json:"recordFormat,omitempty"`
-	RecordLength RecordLength `json:"recordLength,omitempty"`
-	BlockSize    BlockSize   `json:"blockSize,omitempty"`
-	Directory    int         `json:"directory,omitempty"` // For partitioned datasets
-	Created      time.Time   `json:"created,omitempty"`
-	Modified     time.Time   `json:"modified,omitempty"`
-	Size         int64       `json:"size,omitempty"`
-	Used         int64       `json:"used,omitempty"`
-	Extents      int         `json:"extents,omitempty"`
-	Referenced   time.Time   `json:"referenced,omitempty"`
-	Expiration   time.Time   `json:"expiration,omitempty"`
-	Owner        string      `json:"owner,omitempty"`
-	Security     string      `json:"security,omitempty"`
+	Name         string `json:"dsname"`           // Dataset name
+	Type         string `json:"dsorg"`            // Dataset organization (PS, PO, PO-E, etc.)
+	Volume       string `json:"vol,omitempty"`    // Volume serial
+	BlockSize    string `json:"blksz,omitempty"`  // Block size
+	RecordLength string `json:"lrecl,omitempty"`  // Record length  
+	RecordFormat string `json:"recfm,omitempty"`  // Record format
+	Catalog      string `json:"catnm,omitempty"`  // Catalog name
+	CreatedDate  string `json:"cdate,omitempty"`  // Creation date
+	Device       string `json:"dev,omitempty"`    // Device type
+	DatasetType  string `json:"dsntp,omitempty"`  // Dataset type (LIBRARY, etc.)
+	ExpiryDate   string `json:"edate,omitempty"`  // Expiry date
+	Extents      string `json:"extx,omitempty"`   // Number of extents
+	Migrated     string `json:"migr,omitempty"`   // Migration status
+	MultiVolume  string `json:"mvol,omitempty"`   // Multi-volume indicator
+	Overflow     string `json:"ovf,omitempty"`    // Overflow indicator
+	RefDate      string `json:"rdate,omitempty"`  // Referenced date
+	SizeX        string `json:"sizex,omitempty"`  // Size
+	SpaceUnit    string `json:"spacu,omitempty"`  // Space unit
+	Used         string `json:"used,omitempty"`   // Used percentage
+	VolumeList   string `json:"vols,omitempty"`   // Volume list
 }
 
 // Space represents space allocation parameters
@@ -83,30 +82,24 @@ type Space struct {
 	Directory int       `json:"directory,omitempty"` // For partitioned datasets
 }
 
-// DatasetMember represents a member in a partitioned dataset
+// DatasetMember represents a member in a partitioned dataset matching z/OSMF API response
 type DatasetMember struct {
-	Name      string    `json:"name"`
-	Size      int64     `json:"size"`
-	Created   time.Time `json:"created,omitempty"`
-	Modified  time.Time `json:"modified,omitempty"`
-	UserID    string    `json:"userid,omitempty"`
-	Version   int       `json:"version,omitempty"`
-	ModLevel  int       `json:"modLevel,omitempty"`
-	ChangeDate time.Time `json:"changeDate,omitempty"`
+	Name string `json:"member"` // Member name from z/OSMF API
 }
 
-// DatasetList represents a list of datasets
+// DatasetList represents a list of datasets matching z/OSMF API response
 type DatasetList struct {
-	Datasets []Dataset `json:"datasets"`
-	Returned int       `json:"returned"`
-	Total    int       `json:"total"`
+	Datasets     []Dataset `json:"items"`           // Array of datasets
+	ReturnedRows int       `json:"returnedRows"`    // Number of rows returned
+	MoreRows     bool      `json:"moreRows"`        // Whether there are more rows
+	JSONVersion  int       `json:"JSONversion"`     // API version
 }
 
-// MemberList represents a list of members in a partitioned dataset
+// MemberList represents a list of members in a partitioned dataset matching z/OSMF API response
 type MemberList struct {
-	Members  []DatasetMember `json:"members"`
-	Returned int             `json:"returned"`
-	Total    int             `json:"total"`
+	Members      []DatasetMember `json:"items"`           // Array of members
+	ReturnedRows int             `json:"returnedRows"`    // Number of rows returned
+	JSONVersion  int             `json:"JSONversion"`     // API version
 }
 
 // CreateDatasetRequest represents a request to create a dataset
