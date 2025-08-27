@@ -129,50 +129,27 @@ func (jm *ZOSMFJobManager) ListJobs(filter *JobFilter) (*JobList, error) {
 
 // GetJob retrieves detailed information about a specific job by correlator
 func (jm *ZOSMFJobManager) GetJob(correlator string) (*Job, error) {
-	session := jm.session.(*profile.Session)
+	// Parse correlator to get jobname and jobid
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid correlator format: %w", err)
+	}
 	
-	// Build URL using correlator
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator))
-
-	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
-	}
-
-	// Add headers
-	for key, value := range session.GetHeaders() {
-		req.Header.Set(key, value)
-	}
-
-	// Make request
-	resp, err := session.GetHTTPClient().Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var job Job
-	if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &job, nil
+	return jm.GetJobByNameID(jobName, jobID)
 }
 
 // GetJobInfo retrieves job information
 func (jm *ZOSMFJobManager) GetJobInfo(correlator string) (*JobInfo, error) {
+	// Parse correlator to get jobname and jobid
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid correlator format: %w", err)
+	}
+	
 	session := jm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + JobFilesEndpoint
+	// Build URL using jobname/jobid format
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByNameIDEndpoint, url.PathEscape(jobName), url.PathEscape(jobID)) + JobFilesEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
