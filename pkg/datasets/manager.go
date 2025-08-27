@@ -256,31 +256,42 @@ func (dm *ZOSMFDatasetManager) DeleteDataset(name string) error {
 func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
+	// Build URL using correct z/OSMF format
+	var apiURL string
 	if request.MemberName != "" {
-		apiURL += "/" + url.PathEscape(request.MemberName)
+		// For members, use dataset(member) format
+		apiURL = session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(request.DatasetName), url.PathEscape(request.MemberName))
+	} else {
+		// For datasets, use the standard endpoint
+		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
 	}
 
-	// Prepare request body
-	requestBody := map[string]interface{}{
-		"content": request.Content,
-	}
-	if request.Encoding != "" {
-		requestBody["encoding"] = request.Encoding
-	}
-	if request.Replace {
-		requestBody["replace"] = true
-	}
+	var req *http.Request
+	var err error
 
-	// Serialize request body
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %w", err)
-	}
+	if request.MemberName != "" {
+		// For members, use PUT with plain text content
+		req, err = http.NewRequest("PUT", apiURL, bytes.NewBufferString(request.Content))
+	} else {
+		// For datasets, use POST with JSON (original behavior)
+		requestBody := map[string]interface{}{
+			"content": request.Content,
+		}
+		if request.Encoding != "" {
+			requestBody["encoding"] = request.Encoding
+		}
+		if request.Replace {
+			requestBody["replace"] = true
+		}
 
-	// Create request
-	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
+		// Serialize request body
+		jsonBody, err := json.Marshal(requestBody)
+		if err != nil {
+			return fmt.Errorf("failed to marshal request body: %w", err)
+		}
+
+		req, err = http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -289,7 +300,14 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 	for key, value := range session.GetHeaders() {
 		req.Header.Set(key, value)
 	}
-	req.Header.Set("Content-Type", "application/json")
+	
+	if request.MemberName != "" {
+		// For members, use plain text content type
+		req.Header.Set("Content-Type", "text/plain")
+	} else {
+		// For datasets, use JSON content type
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	// Make request
 	resp, err := session.GetHTTPClient().Do(req)
@@ -311,10 +329,14 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 func (dm *ZOSMFDatasetManager) DownloadContent(request *DownloadRequest) (string, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
+	// Build URL using correct z/OSMF format
+	var apiURL string
 	if request.MemberName != "" {
-		apiURL += "/" + url.PathEscape(request.MemberName)
+		// For members, use dataset(member) format
+		apiURL = session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(request.DatasetName), url.PathEscape(request.MemberName))
+	} else {
+		// For datasets, use the standard endpoint
+		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
 	}
 
 	// Add query parameters

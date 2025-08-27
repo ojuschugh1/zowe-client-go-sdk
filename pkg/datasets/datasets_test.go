@@ -2,6 +2,7 @@ package datasets
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -600,17 +601,16 @@ func TestUploadText(t *testing.T) {
 func TestUploadTextToMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/content/MEMBER1", r.URL.Path)
+		assert.Equal(t, "PUT", r.Method)  // Changed from POST to PUT for members
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS(MEMBER1)", r.URL.Path)
+		assert.Equal(t, "text/plain", r.Header.Get("Content-Type"))  // Changed from JSON to plain text
 		
-		// Parse request body
-		var requestBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&requestBody)
+		// Read request body as plain text
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
 		
-		// Verify request body
-		assert.Equal(t, "Hello, World!", requestBody["content"])
-		assert.Equal(t, "UTF-8", requestBody["encoding"])
-		assert.Equal(t, true, requestBody["replace"])
+		// Verify request body is plain text
+		assert.Equal(t, "Hello, World!", string(body))
 		
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -655,7 +655,7 @@ func TestDownloadTextFromMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/content/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS(MEMBER1)", r.URL.Path)
 		assert.Equal(t, "UTF-8", r.URL.Query().Get("encoding"))
 		
 		w.Header().Set("Content-Type", "text/plain")
