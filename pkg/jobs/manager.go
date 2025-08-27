@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
@@ -127,15 +128,38 @@ func (jm *ZOSMFJobManager) ListJobs(filter *JobFilter) (*JobList, error) {
 	return nil, fmt.Errorf("failed to decode response: %s", string(bodyBytes))
 }
 
-// GetJob retrieves detailed information about a specific job by correlator
+// GetJob retrieves detailed information about a specific job by correlator or job ID
 func (jm *ZOSMFJobManager) GetJob(correlator string) (*Job, error) {
-	// Parse correlator to get jobname and jobid
-	jobName, jobID, err := parseCorrelator(correlator)
-	if err != nil {
-		return nil, fmt.Errorf("invalid correlator format: %w", err)
+	// Check if it's already in correlator format (jobname:jobid)
+	if strings.Contains(correlator, ":") {
+		// Parse correlator to get jobname and jobid
+		jobName, jobID, err := parseCorrelator(correlator)
+		if err != nil {
+			return nil, fmt.Errorf("invalid correlator format: %w", err)
+		}
+		return jm.GetJobByNameID(jobName, jobID)
 	}
 	
-	return jm.GetJobByNameID(jobName, jobID)
+	// If it's just a job ID, we need to find the job first
+	// List jobs and find the one with this job ID
+	jobFilter := &JobFilter{
+		JobID: correlator,
+		MaxJobs: 100, // Get more jobs to find the one we need
+	}
+	
+	jobList, err := jm.ListJobs(jobFilter)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find job with ID %s: %w", correlator, err)
+	}
+	
+	// Find the job with the specified job ID
+	for _, job := range jobList.Jobs {
+		if job.JobID == correlator {
+			return jm.GetJobByNameID(job.JobName, job.JobID)
+		}
+	}
+	
+	return nil, fmt.Errorf("job with ID %s not found", correlator)
 }
 
 // GetJobInfo retrieves job information
@@ -267,8 +291,14 @@ func (jm *ZOSMFJobManager) SubmitJob(request *SubmitJobRequest) (*SubmitJobRespo
 		contentType = "text/plain"
 	} else if request.JobDataSet != "" {
 		// Submit job from dataset using JSON format
+		// z/OSMF expects the dataset name to be prefixed with "//" for absolute path
+		datasetPath := request.JobDataSet
+		if !strings.HasPrefix(datasetPath, "//") {
+			datasetPath = "//" + datasetPath
+		}
+		
 		body := map[string]interface{}{
-			"file": request.JobDataSet,
+			"file": datasetPath,
 		}
 		if request.Volume != "" {
 			body["volume"] = request.Volume

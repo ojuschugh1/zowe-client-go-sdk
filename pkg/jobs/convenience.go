@@ -62,6 +62,19 @@ func (jm *ZOSMFJobManager) SubmitJobStatement(jclStatement string) (*SubmitJobRe
 
 // SubmitJobFromDataset submits a job from a dataset
 func (jm *ZOSMFJobManager) SubmitJobFromDataset(dataset string, volume string) (*SubmitJobResponse, error) {
+	// Ensure dataset name is properly formatted for z/OSMF
+	// Remove any existing "//" prefix to ensure consistency
+	dataset = strings.TrimPrefix(dataset, "//")
+	
+	// z/OSMF automatically adds the user prefix, so we should use relative dataset names
+	// If the dataset name starts with the user ID, remove it to avoid duplication
+	// This is a common pattern in z/OSMF APIs
+	session := jm.session.(*profile.Session)
+	userID := session.User
+	if strings.HasPrefix(dataset, userID+".") {
+		dataset = strings.TrimPrefix(dataset, userID+".")
+	}
+	
 	request := &SubmitJobRequest{
 		JobDataSet: dataset,
 		Volume:     volume,
@@ -147,10 +160,42 @@ func (jm *ZOSMFJobManager) GetJobsByStatus(status string, maxJobs int) (*JobList
 
 // GetJobOutput retrieves the output of a completed job
 func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, error) {
-	// Parse correlator to get jobname and jobid
-	jobName, jobID, err := parseCorrelator(correlator)
-	if err != nil {
-		return nil, fmt.Errorf("invalid correlator format: %w", err)
+	var jobName, jobID string
+	var err error
+	
+	// Check if it's already in correlator format (jobname:jobid)
+	if strings.Contains(correlator, ":") {
+		// Parse correlator to get jobname and jobid
+		jobName, jobID, err = parseCorrelator(correlator)
+		if err != nil {
+			return nil, fmt.Errorf("invalid correlator format: %w", err)
+		}
+	} else {
+		// If it's just a job ID, we need to find the job first
+		jobFilter := &JobFilter{
+			JobID: correlator,
+			MaxJobs: 100,
+		}
+		
+		jobList, err := jm.ListJobs(jobFilter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find job with ID %s: %w", correlator, err)
+		}
+		
+		// Find the job with the specified job ID
+		found := false
+		for _, job := range jobList.Jobs {
+			if job.JobID == correlator {
+				jobName = job.JobName
+				jobID = job.JobID
+				found = true
+				break
+			}
+		}
+		
+		if !found {
+			return nil, fmt.Errorf("job with ID %s not found", correlator)
+		}
 	}
 
 	// Get spool files
@@ -175,10 +220,42 @@ func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, e
 
 // GetJobOutputByDDName retrieves the output of a specific DD name for a job
 func (jm *ZOSMFJobManager) GetJobOutputByDDName(correlator, ddName string) (string, error) {
-	// Parse correlator to get jobname and jobid
-	jobName, jobID, err := parseCorrelator(correlator)
-	if err != nil {
-		return "", fmt.Errorf("invalid correlator format: %w", err)
+	var jobName, jobID string
+	var err error
+	
+	// Check if it's already in correlator format (jobname:jobid)
+	if strings.Contains(correlator, ":") {
+		// Parse correlator to get jobname and jobid
+		jobName, jobID, err = parseCorrelator(correlator)
+		if err != nil {
+			return "", fmt.Errorf("invalid correlator format: %w", err)
+		}
+	} else {
+		// If it's just a job ID, we need to find the job first
+		jobFilter := &JobFilter{
+			JobID: correlator,
+			MaxJobs: 100,
+		}
+		
+		jobList, err := jm.ListJobs(jobFilter)
+		if err != nil {
+			return "", fmt.Errorf("failed to find job with ID %s: %w", correlator, err)
+		}
+		
+		// Find the job with the specified job ID
+		found := false
+		for _, job := range jobList.Jobs {
+			if job.JobID == correlator {
+				jobName = job.JobName
+				jobID = job.JobID
+				found = true
+				break
+			}
+		}
+		
+		if !found {
+			return "", fmt.Errorf("job with ID %s not found", correlator)
+		}
 	}
 
 	// Get spool files
