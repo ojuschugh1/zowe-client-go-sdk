@@ -146,12 +146,13 @@ func (dm *ZOSMFDatasetManager) GetDataset(name string) (*Dataset, error) {
 	return nil, fmt.Errorf("dataset not found: %s", name)
 }
 
-// CreateDataset creates a new dataset
+// CreateDataset creates a new dataset using the correct z/OSMF REST API format
+// Based on IBM documentation: POST /zosmf/restfiles/ds/<data-set-name>
 func (dm *ZOSMFDatasetManager) CreateDataset(request *CreateDatasetRequest) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint
+	// Build URL using the correct format from IBM documentation
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.Name))
 
 	// Prepare request body
 	requestBody := map[string]interface{}{
@@ -513,16 +514,19 @@ func (dm *ZOSMFDatasetManager) Exists(name string) (bool, error) {
 	return false, nil
 }
 
-// CopyDataset copies a dataset
+// CopyDataset copies a dataset using the z/OSMF REST API
 func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(sourceName)) + "/copy"
+	// Build URL to the target dataset (z/OSMF format: PUT to target with source in body)
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(targetName))
 
-	// Prepare request body
-	requestBody := map[string]string{
-		"target": targetName,
+	// Prepare request body according to z/OSMF API specification
+	requestBody := map[string]interface{}{
+		"request": "copy",
+		"from-dataset": map[string]string{
+			"dsn": sourceName,
+		},
 	}
 
 	// Serialize request body
@@ -531,8 +535,8 @@ func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error 
 		return fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	// Create request
-	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
+	// Create request (PUT to target dataset, not POST to source/copy)
+	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -559,16 +563,19 @@ func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error 
 	return nil
 }
 
-// RenameDataset renames a dataset
+// RenameDataset renames a dataset using the z/OSMF REST API
 func (dm *ZOSMFDatasetManager) RenameDataset(oldName, newName string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(oldName)) + "/rename"
+	// Build URL to the new dataset name (z/OSMF format: PUT to target with source in body)
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(newName))
 
-	// Prepare request body
-	requestBody := map[string]string{
-		"newName": newName,
+	// Prepare request body according to z/OSMF API specification
+	requestBody := map[string]interface{}{
+		"request": "rename",
+		"from-dataset": map[string]string{
+			"dsn": oldName,
+		},
 	}
 
 	// Serialize request body
@@ -577,7 +584,7 @@ func (dm *ZOSMFDatasetManager) RenameDataset(oldName, newName string) error {
 		return fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	// Create request
+	// Create request (PUT to target dataset, not PUT to source/rename)
 	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -597,7 +604,7 @@ func (dm *ZOSMFDatasetManager) RenameDataset(oldName, newName string) error {
 	defer resp.Body.Close()
 
 	// Check response status
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}

@@ -173,7 +173,7 @@ func TestCreateDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -419,15 +419,17 @@ func TestExists(t *testing.T) {
 func TestCopyDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/SOURCE.DATA/copy", r.URL.Path)
+		assert.Equal(t, "PUT", r.Method)
+		assert.Equal(t, "/api/v1/restfiles/ds/TARGET.DATA", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&requestBody)
 		
-		// Verify request body
-		assert.Equal(t, "TARGET.DATA", requestBody["target"])
+		// Verify request body structure
+		assert.Equal(t, "copy", requestBody["request"])
+		fromDataset := requestBody["from-dataset"].(map[string]interface{})
+		assert.Equal(t, "SOURCE.DATA", fromDataset["dsn"])
 		
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -448,16 +450,18 @@ func TestRenameDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/OLD.DATA/rename", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/NEW.DATA", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
 		json.NewDecoder(r.Body).Decode(&requestBody)
 		
-		// Verify request body
-		assert.Equal(t, "NEW.DATA", requestBody["newName"])
+		// Verify request body structure
+		assert.Equal(t, "rename", requestBody["request"])
+		fromDataset := requestBody["from-dataset"].(map[string]interface{})
+		assert.Equal(t, "OLD.DATA", fromDataset["dsn"])
 		
-		w.WriteHeader(http.StatusOK)
+		w.WriteHeader(http.StatusCreated)
 	}))
 	defer server.Close()
 
@@ -501,7 +505,7 @@ func TestCreateSequentialDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.SEQ", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
@@ -536,7 +540,7 @@ func TestCreatePartitionedDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS", r.URL.Path)
 		
 		// Parse request body
 		var requestBody map[string]interface{}
