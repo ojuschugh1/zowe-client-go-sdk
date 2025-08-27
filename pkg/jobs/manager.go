@@ -416,12 +416,12 @@ func (jm *ZOSMFJobManager) DeleteJob(correlator string) error {
 	return nil
 }
 
-// GetSpoolFiles retrieves spool files for a job
-func (jm *ZOSMFJobManager) GetSpoolFiles(correlator string) ([]SpoolFile, error) {
+// GetSpoolFiles retrieves spool files for a job using jobname and jobid
+func (jm *ZOSMFJobManager) GetSpoolFiles(jobName, jobID string) ([]SpoolFile, error) {
 	session := jm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + JobFilesEndpoint
+	// Build URL using the correct z/OSMF format: /restjobs/jobs/{jobname}/{jobid}/files
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByNameIDEndpoint, url.PathEscape(jobName), url.PathEscape(jobID)) + JobFilesEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -457,11 +457,11 @@ func (jm *ZOSMFJobManager) GetSpoolFiles(correlator string) ([]SpoolFile, error)
 }
 
 // GetSpoolFileContent retrieves the content of a specific spool file
-func (jm *ZOSMFJobManager) GetSpoolFileContent(correlator string, spoolID int) (string, error) {
+func (jm *ZOSMFJobManager) GetSpoolFileContent(jobName, jobID string, spoolID int) (string, error) {
 	session := jm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + fmt.Sprintf(JobFilesByIDEndpoint, strconv.Itoa(spoolID))
+	// Build URL using the correct z/OSMF format: /restjobs/jobs/{jobname}/{jobid}/files/{id}/records
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByNameIDEndpoint, url.PathEscape(jobName), url.PathEscape(jobID)) + fmt.Sprintf(JobFilesByIDEndpoint, strconv.Itoa(spoolID))
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -495,6 +495,28 @@ func (jm *ZOSMFJobManager) GetSpoolFileContent(correlator string, spoolID int) (
 
 	return string(body), nil
 }
+
+// GetSpoolFilesByCorrelator retrieves spool files for a job using correlator format (jobname:jobid)
+// This is a convenience method that maintains backward compatibility
+func (jm *ZOSMFJobManager) GetSpoolFilesByCorrelator(correlator string) ([]SpoolFile, error) {
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid correlator format: %w", err)
+	}
+	return jm.GetSpoolFiles(jobName, jobID)
+}
+
+// GetSpoolFileContentByCorrelator retrieves the content of a specific spool file using correlator format
+// This is a convenience method that maintains backward compatibility
+func (jm *ZOSMFJobManager) GetSpoolFileContentByCorrelator(correlator string, spoolID int) (string, error) {
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return "", fmt.Errorf("invalid correlator format: %w", err)
+	}
+	return jm.GetSpoolFileContent(jobName, jobID, spoolID)
+}
+
+
 
 // PurgeJob purges a job (removes it from the system)
 func (jm *ZOSMFJobManager) PurgeJob(correlator string) error {

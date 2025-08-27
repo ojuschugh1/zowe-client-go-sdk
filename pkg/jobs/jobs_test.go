@@ -386,7 +386,7 @@ func TestGetSpoolFiles(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restjobs/jobs/JOB001/files", r.URL.Path)
+		assert.Equal(t, "/api/v1/restjobs/jobs/TESTJOB/JOB001/files", r.URL.Path)
 		
 		// Return mock response
 		spoolFiles := []SpoolFile{
@@ -418,7 +418,7 @@ func TestGetSpoolFiles(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get spool files
-	spoolFiles, err := jm.GetSpoolFiles("JOB001")
+	spoolFiles, err := jm.GetSpoolFiles("TESTJOB", "JOB001")
 	require.NoError(t, err)
 	assert.Len(t, spoolFiles, 2)
 	assert.Equal(t, "JESMSGLG", spoolFiles[0].DDName)
@@ -431,7 +431,7 @@ func TestGetSpoolFileContent(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restjobs/jobs/JOB001/files/1/records", r.URL.Path)
+		assert.Equal(t, "/api/v1/restjobs/jobs/TESTJOB/JOB001/files/1/records", r.URL.Path)
 		
 		// Return mock content
 		w.Header().Set("Content-Type", "text/plain")
@@ -448,7 +448,7 @@ func TestGetSpoolFileContent(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get spool file content
-	content, err := jm.GetSpoolFileContent("JOB001", 1)
+	content, err := jm.GetSpoolFileContent("TESTJOB", "JOB001", 1)
 	require.NoError(t, err)
 	assert.Equal(t, "JES2 JOB LOG OUTPUT", content)
 }
@@ -805,7 +805,7 @@ func TestGetSpoolFilesErrors(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get spool files error
-	_, err = jm.GetSpoolFiles("JOB001")
+	_, err = jm.GetSpoolFiles("INVALID", "JOB001")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "API request failed with status 500")
 }
@@ -825,7 +825,7 @@ func TestGetSpoolFileContentErrors(t *testing.T) {
 	jm := NewJobManager(session)
 
 	// Test get spool file content error
-	_, err = jm.GetSpoolFileContent("JOB001", 999)
+	_, err = jm.GetSpoolFileContent("INVALID", "JOB001", 999)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "API request failed with status 404")
 }

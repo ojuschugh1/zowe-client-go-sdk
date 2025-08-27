@@ -8,6 +8,15 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
+// parseCorrelator parses a correlator in the format "jobname:jobid" into separate components
+func parseCorrelator(correlator string) (jobName, jobID string, err error) {
+	parts := strings.Split(correlator, ":")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("correlator must be in format 'jobname:jobid', got: %s", correlator)
+	}
+	return parts[0], parts[1], nil
+}
+
 // CreateJobManager creates a new job manager from a profile manager
 func CreateJobManager(pm *profile.ZOSMFProfileManager, profileName string) (*ZOSMFJobManager, error) {
 	zosmfProfile, err := pm.GetZOSMFProfile(profileName)
@@ -138,8 +147,14 @@ func (jm *ZOSMFJobManager) GetJobsByStatus(status string, maxJobs int) (*JobList
 
 // GetJobOutput retrieves the output of a completed job
 func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, error) {
+	// Parse correlator to get jobname and jobid
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid correlator format: %w", err)
+	}
+
 	// Get spool files
-	spoolFiles, err := jm.GetSpoolFiles(correlator)
+	spoolFiles, err := jm.GetSpoolFiles(jobName, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get spool files: %w", err)
 	}
@@ -147,7 +162,7 @@ func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, e
 	// Get content for each spool file
 	output := make(map[string]string)
 	for _, spoolFile := range spoolFiles {
-		content, err := jm.GetSpoolFileContent(correlator, spoolFile.ID)
+		content, err := jm.GetSpoolFileContent(jobName, jobID, spoolFile.ID)
 		if err != nil {
 			// Log error but continue with other files
 			continue
@@ -160,8 +175,14 @@ func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, e
 
 // GetJobOutputByDDName retrieves the output of a specific DD name for a job
 func (jm *ZOSMFJobManager) GetJobOutputByDDName(correlator, ddName string) (string, error) {
+	// Parse correlator to get jobname and jobid
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return "", fmt.Errorf("invalid correlator format: %w", err)
+	}
+
 	// Get spool files
-	spoolFiles, err := jm.GetSpoolFiles(correlator)
+	spoolFiles, err := jm.GetSpoolFiles(jobName, jobID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get spool files: %w", err)
 	}
@@ -169,7 +190,7 @@ func (jm *ZOSMFJobManager) GetJobOutputByDDName(correlator, ddName string) (stri
 	// Find the spool file with the specified DD name
 	for _, spoolFile := range spoolFiles {
 		if spoolFile.DDName == ddName {
-			content, err := jm.GetSpoolFileContent(correlator, spoolFile.ID)
+			content, err := jm.GetSpoolFileContent(jobName, jobID, spoolFile.ID)
 			if err != nil {
 				return "", fmt.Errorf("failed to get content for DD %s: %w", ddName, err)
 			}
