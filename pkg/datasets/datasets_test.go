@@ -235,17 +235,16 @@ func TestDeleteDataset(t *testing.T) {
 func TestUploadContent(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA/content", r.URL.Path)
+		assert.Equal(t, "PUT", r.Method)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
 		
-		// Parse request body
-		var requestBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&requestBody)
+		// Verify content type
+		assert.Equal(t, "text/plain", r.Header.Get("Content-Type"))
 		
-		// Verify request body
-		assert.Equal(t, "Hello, World!", requestBody["content"])
-		assert.Equal(t, "UTF-8", requestBody["encoding"])
-		assert.Equal(t, true, requestBody["replace"])
+		// Read and verify request body
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.Equal(t, "Hello, World!", string(body))
 		
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -273,7 +272,7 @@ func TestDownloadContent(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA/content", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
 		
 		w.Header().Set("Content-Type", "text/plain")
 		w.Write([]byte("Hello, World!"))
@@ -517,9 +516,9 @@ func TestCreateSequentialDataset(t *testing.T) {
 		assert.Equal(t, "TRK", requestBody["alcunit"])
 		assert.Equal(t, float64(10), requestBody["primary"])
 		assert.Equal(t, float64(5), requestBody["secondary"])
-		assert.Equal(t, "F", requestBody["recfm"])
-		assert.Equal(t, float64(80), requestBody["lrecl"])
-		assert.Equal(t, float64(800), requestBody["blksize"])
+		assert.Equal(t, "V", requestBody["recfm"])
+		assert.Equal(t, float64(256), requestBody["lrecl"])
+		assert.Equal(t, float64(27920), requestBody["blksize"])
 		
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -553,9 +552,9 @@ func TestCreatePartitionedDataset(t *testing.T) {
 		assert.Equal(t, float64(10), requestBody["primary"])
 		assert.Equal(t, float64(5), requestBody["secondary"])
 		assert.Equal(t, float64(5), requestBody["dirblk"])
-		assert.Equal(t, "F", requestBody["recfm"])
-		assert.Equal(t, float64(80), requestBody["lrecl"])
-		assert.Equal(t, float64(800), requestBody["blksize"])
+		assert.Equal(t, "V", requestBody["recfm"])
+		assert.Equal(t, float64(256), requestBody["lrecl"])
+		assert.Equal(t, float64(27920), requestBody["blksize"])
 		
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -575,17 +574,16 @@ func TestCreatePartitionedDataset(t *testing.T) {
 func TestUploadText(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "POST", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA/content", r.URL.Path)
+		assert.Equal(t, "PUT", r.Method)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
 		
-		// Parse request body
-		var requestBody map[string]interface{}
-		json.NewDecoder(r.Body).Decode(&requestBody)
+		// Verify content type
+		assert.Equal(t, "text/plain", r.Header.Get("Content-Type"))
 		
-		// Verify request body
-		assert.Equal(t, "Hello, World!", requestBody["content"])
-		assert.Equal(t, "UTF-8", requestBody["encoding"])
-		assert.Equal(t, true, requestBody["replace"])
+		// Read and verify request body
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.Equal(t, "Hello, World!", string(body))
 		
 		w.WriteHeader(http.StatusCreated)
 	}))
@@ -635,7 +633,7 @@ func TestDownloadText(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA/content", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.DATA", r.URL.Path)
 		assert.Equal(t, "UTF-8", r.URL.Query().Get("encoding"))
 		
 		w.Header().Set("Content-Type", "text/plain")

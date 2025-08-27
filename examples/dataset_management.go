@@ -46,8 +46,8 @@ func demonstrateDatasetManagement(dm *datasets.ZOSMFDatasetManager) {
 	} else {
 		fmt.Printf("   Found %d datasets\n", len(datasetList.Datasets))
 		for _, dataset := range datasetList.Datasets {
-			fmt.Printf("   - %s (%s): %d bytes used of %d\n", 
-				dataset.Name, dataset.Type, dataset.Used, dataset.Size)
+					fmt.Printf("   - %s (%s): %s%% used, size: %s\n", 
+			dataset.Name, dataset.Type, dataset.Used, dataset.SizeX)
 		}
 	}
 
@@ -147,7 +147,7 @@ func demonstrateDatasetManagement(dm *datasets.ZOSMFDatasetManager) {
 	} else {
 		fmt.Printf("   Found %d members:\n", len(memberList.Members))
 		for _, member := range memberList.Members {
-			fmt.Printf("   - %s: %d bytes\n", member.Name, member.Size)
+			fmt.Printf("   - %s\n", member.Name)
 		}
 	}
 
@@ -160,9 +160,8 @@ func demonstrateDatasetManagement(dm *datasets.ZOSMFDatasetManager) {
 	} else {
 		fmt.Printf("   Dataset: %s\n", dataset.Name)
 		fmt.Printf("   Type: %s\n", dataset.Type)
-		fmt.Printf("   Size: %d bytes\n", dataset.Size)
-		fmt.Printf("   Used: %d bytes\n", dataset.Used)
-		fmt.Printf("   Owner: %s\n", dataset.Owner)
+		fmt.Printf("   Size: %s\n", dataset.SizeX)
+		fmt.Printf("   Used: %s%%\n", dataset.Used)
 	}
 
 	// Example 13: Check if dataset exists

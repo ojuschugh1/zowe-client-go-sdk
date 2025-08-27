@@ -131,7 +131,9 @@ func demonstrateJobManagement(jm *jobs.ZOSMFJobManager) {
 
 	// Example 9: Get spool files
 	fmt.Println("\n9. Getting spool files:")
-	spoolFiles, err := jm.GetSpoolFiles(jobID)
+	// Use sample job name and ID for demonstration
+	jobName := "TESTJOB"
+	spoolFiles, err := jm.GetSpoolFiles(jobName, jobID)
 	if err != nil {
 		fmt.Printf("   Error getting spool files: %v\n", err)
 		fmt.Println("   (This is expected if not connected to a real mainframe)")
@@ -146,7 +148,7 @@ func demonstrateJobManagement(jm *jobs.ZOSMFJobManager) {
 	// Example 10: Get spool file content
 	fmt.Println("\n10. Getting spool file content:")
 	if len(spoolFiles) > 0 {
-		content, err := jm.GetSpoolFileContent(jobID, spoolFiles[0].ID)
+		content, err := jm.GetSpoolFileContent(jobName, jobID, spoolFiles[0].ID)
 		if err != nil {
 			fmt.Printf("   Error getting spool file content: %v\n", err)
 		} else {
