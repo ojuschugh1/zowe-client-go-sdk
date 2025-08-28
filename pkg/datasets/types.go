@@ -160,6 +160,7 @@ type DatasetManager interface {
 	// Utility operations
 	Exists(name string) (bool, error)
 	CopyDataset(sourceName, targetName string) error
+	CopyMember(sourceName, sourceMember, targetName, targetMember string) error
 	RenameDataset(oldName, newName string) error
 }
 

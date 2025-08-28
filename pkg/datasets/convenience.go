@@ -376,3 +376,13 @@ func CreateSmallSpace(unit SpaceUnit) Space {
 		Directory: 2, // For partitioned datasets
 	}
 }
+
+// CopyMemberToSameDataset copies a member within the same partitioned dataset
+func (dm *ZOSMFDatasetManager) CopyMemberToSameDataset(datasetName, sourceMember, targetMember string) error {
+	return dm.CopyMember(datasetName, sourceMember, datasetName, targetMember)
+}
+
+// CopyMemberWithSameName copies a member from one dataset to another with the same member name
+func (dm *ZOSMFDatasetManager) CopyMemberWithSameName(sourceDataset, targetDataset, memberName string) error {
+	return dm.CopyMember(sourceDataset, memberName, targetDataset, memberName)
+}

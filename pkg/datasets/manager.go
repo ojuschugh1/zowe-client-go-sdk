@@ -481,8 +481,8 @@ func (dm *ZOSMFDatasetManager) ListMembers(datasetName string) (*MemberList, err
 func (dm *ZOSMFDatasetManager) GetMember(datasetName, memberName string) (*DatasetMember, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(datasetName)) + fmt.Sprintf(MemberByNameEndpoint, url.PathEscape(memberName))
+	// Build URL using correct z/OSMF format: /zosmf/restfiles/ds/<dataset-name>(<member-name>)
+	apiURL := session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(datasetName), url.PathEscape(memberName))
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -521,8 +521,8 @@ func (dm *ZOSMFDatasetManager) GetMember(datasetName, memberName string) (*Datas
 func (dm *ZOSMFDatasetManager) DeleteMember(datasetName, memberName string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(datasetName)) + fmt.Sprintf(MemberByNameEndpoint, url.PathEscape(memberName))
+	// Build URL using correct z/OSMF format: /zosmf/restfiles/ds/<dataset-name>(<member-name>)
+	apiURL := session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(datasetName), url.PathEscape(memberName))
 
 	// Create request
 	req, err := http.NewRequest("DELETE", apiURL, nil)
@@ -570,13 +570,14 @@ func (dm *ZOSMFDatasetManager) Exists(name string) (bool, error) {
 }
 
 // CopyDataset copies a dataset using the z/OSMF REST API
+// This function handles copying entire datasets (not members)
 func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error {
 	session := dm.session.(*profile.Session)
 	
 	// Build URL to the target dataset (z/OSMF format: PUT to target with source in body)
 	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(targetName))
 
-	// Prepare request body according to z/OSMF API specification
+	// Prepare request body according to z/OSMF API specification for dataset copy
 	requestBody := map[string]interface{}{
 		"request": "copy",
 		"from-dataset": map[string]string{
@@ -591,6 +592,58 @@ func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error 
 	}
 
 	// Create request (PUT to target dataset, not POST to source/copy)
+	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add headers
+	for key, value := range session.GetHeaders() {
+		req.Header.Set(key, value)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Make request
+	resp, err := session.GetHTTPClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// CopyMember copies a member from one partitioned dataset to another using the z/OSMF REST API
+// sourceName should be in format "DATASET.NAME" and sourceMember is the member name
+// targetName should be in format "DATASET.NAME" and targetMember is the member name
+func (dm *ZOSMFDatasetManager) CopyMember(sourceName, sourceMember, targetName, targetMember string) error {
+	session := dm.session.(*profile.Session)
+	
+	// Build URL to the target member using correct z/OSMF format: /zosmf/restfiles/ds/<target-dataset>(<target-member>)
+	apiURL := session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(targetName), url.PathEscape(targetMember))
+
+	// Prepare request body according to z/OSMF API specification for member copy
+	requestBody := map[string]interface{}{
+		"request": "copy",
+		"from-dataset": map[string]string{
+			"dsn":    sourceName,
+			"member": sourceMember,
+		},
+	}
+
+	// Serialize request body
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	// Create request (PUT to target member)
 	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)

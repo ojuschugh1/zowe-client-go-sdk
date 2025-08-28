@@ -335,7 +335,7 @@ func TestGetMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "GET", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/member/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS(MEMBER1)", r.URL.Path)
 		
 		// Return mock response matching z/OSMF API format
 		response := DatasetMember{
@@ -363,7 +363,7 @@ func TestDeleteMember(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "DELETE", r.Method)
-		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS/member/MEMBER1", r.URL.Path)
+		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS(MEMBER1)", r.URL.Path)
 		
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -443,6 +443,37 @@ func TestCopyDataset(t *testing.T) {
 	// Test copy dataset
 	err = dm.CopyDataset("SOURCE.DATA", "TARGET.DATA")
 	assert.NoError(t, err)
+}
+
+func TestCopyMember(t *testing.T) {
+	// Create test server
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "PUT", r.Method)
+		assert.Equal(t, "/api/v1/restfiles/ds/TARGET.PDS(MEMBER2)", r.URL.Path)
+		
+		// Parse request body
+		var requestBody map[string]interface{}
+		json.NewDecoder(r.Body).Decode(&requestBody)
+		
+		// Verify request body structure
+		assert.Equal(t, "copy", requestBody["request"])
+		fromDataset := requestBody["from-dataset"].(map[string]interface{})
+		assert.Equal(t, "SOURCE.PDS", fromDataset["dsn"])
+		assert.Equal(t, "MEMBER1", fromDataset["member"])
+		
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	// Create dataset manager
+	profile := createTestProfile(server.URL)
+	session, err := profile.NewSession()
+	require.NoError(t, err)
+	dm := NewDatasetManager(session)
+
+	// Test copy member
+	err = dm.CopyMember("SOURCE.PDS", "MEMBER1", "TARGET.PDS", "MEMBER2")
+	require.NoError(t, err)
 }
 
 func TestRenameDataset(t *testing.T) {
