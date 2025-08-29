@@ -177,9 +177,9 @@ func demonstrateDatasetManagement(dm *datasets.ZOSMFDatasetManager) {
 		}
 	}
 
-	// Example 14: Copy dataset
-	fmt.Println("\n14. Copying dataset:")
-	err = dm.CopyDataset("TEST.SEQ", "TEST.COPY")
+	// Example 14: Copy sequential dataset
+	fmt.Println("\n14. Copying sequential dataset:")
+	err = dm.CopySequentialDataset("TEST.SEQ", "TEST.COPY")
 	if err != nil {
 		fmt.Printf("   Error copying dataset: %v\n", err)
 		fmt.Println("   (This is expected if not connected to a real mainframe)")

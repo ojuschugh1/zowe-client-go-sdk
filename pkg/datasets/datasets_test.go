@@ -337,13 +337,9 @@ func TestGetMember(t *testing.T) {
 		assert.Equal(t, "GET", r.Method)
 		assert.Equal(t, "/api/v1/restfiles/ds/TEST.PDS(MEMBER1)", r.URL.Path)
 		
-		// Return mock response matching z/OSMF API format
-		response := DatasetMember{
-			Name: "MEMBER1",
-		}
-		
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		// Return mock member content (z/OSMF returns member content as text)
+		w.Header().Set("Content-Type", "text/plain")
+		w.Write([]byte("Member content here"))
 	}))
 	defer server.Close()
 
@@ -415,7 +411,7 @@ func TestExists(t *testing.T) {
 	assert.True(t, exists)
 }
 
-func TestCopyDataset(t *testing.T) {
+func TestCopySequentialDataset(t *testing.T) {
 	// Create test server
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, "PUT", r.Method)
@@ -441,7 +437,7 @@ func TestCopyDataset(t *testing.T) {
 	dm := NewDatasetManager(session)
 
 	// Test copy dataset
-	err = dm.CopyDataset("SOURCE.DATA", "TARGET.DATA")
+	err = dm.CopySequentialDataset("SOURCE.DATA", "TARGET.DATA")
 	assert.NoError(t, err)
 }
 
@@ -1095,7 +1091,7 @@ func TestDeleteMemberError(t *testing.T) {
 	assert.Contains(t, err.Error(), "API request failed with status 403")
 }
 
-func TestCopyDatasetError(t *testing.T) {
+func TestCopySequentialDatasetError(t *testing.T) {
 	// Create test server that returns 409
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusConflict)
@@ -1110,7 +1106,7 @@ func TestCopyDatasetError(t *testing.T) {
 	dm := NewDatasetManager(session)
 
 	// Test copy dataset error
-	err = dm.CopyDataset("SOURCE.DATA", "TARGET.DATA")
+	err = dm.CopySequentialDataset("SOURCE.DATA", "TARGET.DATA")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "API request failed with status 409")
 }

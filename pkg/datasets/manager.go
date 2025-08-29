@@ -501,13 +501,14 @@ func (dm *ZOSMFDatasetManager) GetMember(datasetName, memberName string) (*Datas
 		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Parse response
-	var member DatasetMember
-	if err := json.NewDecoder(resp.Body).Decode(&member); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	// For member access, z/OSMF returns the member content as text, not JSON
+	// We'll create a DatasetMember with the member name since we can't get metadata
+	// from this endpoint. The member exists if we get a successful response.
+	member := &DatasetMember{
+		Name: memberName,
 	}
 
-	return &member, nil
+	return member, nil
 }
 
 // DeleteMember deletes a member from a partitioned dataset
@@ -562,9 +563,9 @@ func (dm *ZOSMFDatasetManager) Exists(name string) (bool, error) {
 	return false, nil
 }
 
-// CopyDataset copies a dataset using the z/OSMF REST API
+// CopySequentialDataset copies a sequential dataset using the z/OSMF REST API
 // This function handles copying entire datasets (not members)
-func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error {
+func (dm *ZOSMFDatasetManager) CopySequentialDataset(sourceName, targetName string) error {
 	session := dm.session.(*profile.Session)
 	
 	// Build URL to the target dataset (z/OSMF format: PUT to target with source in body)
