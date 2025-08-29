@@ -4,10 +4,10 @@ package datasets
 type DatasetType string
 
 const (
-	DatasetTypeSequential DatasetType = "PS"   // Physical Sequential
-	DatasetTypePartitioned DatasetType = "PO"  // Partitioned Organization
-	DatasetTypePDSE       DatasetType = "PDSE" // Partitioned Dataset Extended
-	DatasetTypeVSAM       DatasetType = "VSAM" // Virtual Storage Access Method
+	DatasetTypeSequential DatasetType = "PS"   // Sequential
+	DatasetTypePartitioned DatasetType = "PO"  // Partitioned (PDS)
+	DatasetTypePDSE       DatasetType = "PDSE" // PDSE
+	DatasetTypeVSAM       DatasetType = "VSAM" // VSAM
 )
 
 // SpaceUnit represents the unit for space allocation
@@ -50,10 +50,10 @@ const (
 	BlockSize32760 BlockSize = 32760
 )
 
-// Dataset represents a z/OS dataset with fields matching z/OSMF API response
+// Dataset represents a z/OS dataset
 type Dataset struct {
 	Name         string `json:"dsname"`           // Dataset name
-	Type         string `json:"dsorg"`            // Dataset organization (PS, PO, PO-E, etc.)
+	Type         string `json:"dsorg"`            // Organization (PS, PO, etc.)
 	Volume       string `json:"vol,omitempty"`    // Volume serial
 	BlockSize    string `json:"blksz,omitempty"`  // Block size
 	RecordLength string `json:"lrecl,omitempty"`  // Record length  
@@ -61,12 +61,12 @@ type Dataset struct {
 	Catalog      string `json:"catnm,omitempty"`  // Catalog name
 	CreatedDate  string `json:"cdate,omitempty"`  // Creation date
 	Device       string `json:"dev,omitempty"`    // Device type
-	DatasetType  string `json:"dsntp,omitempty"`  // Dataset type (LIBRARY, etc.)
+	DatasetType  string `json:"dsntp,omitempty"`  // Dataset type
 	ExpiryDate   string `json:"edate,omitempty"`  // Expiry date
 	Extents      string `json:"extx,omitempty"`   // Number of extents
 	Migrated     string `json:"migr,omitempty"`   // Migration status
-	MultiVolume  string `json:"mvol,omitempty"`   // Multi-volume indicator
-	Overflow     string `json:"ovf,omitempty"`    // Overflow indicator
+	MultiVolume  string `json:"mvol,omitempty"`   // Multi-volume
+	Overflow     string `json:"ovf,omitempty"`    // Overflow
 	RefDate      string `json:"rdate,omitempty"`  // Referenced date
 	SizeX        string `json:"sizex,omitempty"`  // Size
 	SpaceUnit    string `json:"spacu,omitempty"`  // Space unit
@@ -79,26 +79,26 @@ type Space struct {
 	Primary   int       `json:"primary"`
 	Secondary int       `json:"secondary"`
 	Unit      SpaceUnit `json:"unit"`
-	Directory int       `json:"directory,omitempty"` // For partitioned datasets
+	Directory int       `json:"directory,omitempty"` // For PDS
 }
 
-// DatasetMember represents a member in a partitioned dataset matching z/OSMF API response
+// DatasetMember represents a member in a partitioned dataset
 type DatasetMember struct {
-	Name string `json:"member"` // Member name from z/OSMF API
+	Name string `json:"member"` // Member name
 }
 
-// DatasetList represents a list of datasets matching z/OSMF API response
+// DatasetList represents a list of datasets
 type DatasetList struct {
-	Datasets     []Dataset `json:"items"`           // Array of datasets
-	ReturnedRows int       `json:"returnedRows"`    // Number of rows returned
-	MoreRows     bool      `json:"moreRows"`        // Whether there are more rows
+	Datasets     []Dataset `json:"items"`           // Dataset array
+	ReturnedRows int       `json:"returnedRows"`    // Rows returned
+	MoreRows     bool      `json:"moreRows"`        // More data available
 	JSONVersion  int       `json:"JSONversion"`     // API version
 }
 
-// MemberList represents a list of members in a partitioned dataset matching z/OSMF API response
+// MemberList represents a list of members in a PDS
 type MemberList struct {
-	Members      []DatasetMember `json:"items"`           // Array of members
-	ReturnedRows int             `json:"returnedRows"`    // Number of rows returned
+	Members      []DatasetMember `json:"items"`           // Member array
+	ReturnedRows int             `json:"returnedRows"`    // Rows returned
 	JSONVersion  int             `json:"JSONversion"`     // API version
 }
 
@@ -114,19 +114,19 @@ type CreateDatasetRequest struct {
 	Directory    int         `json:"directory,omitempty"`
 }
 
-// UploadRequest represents a request to upload content to a dataset
+// UploadRequest represents a request to upload content
 type UploadRequest struct {
 	DatasetName string `json:"datasetName"`
-	MemberName  string `json:"memberName,omitempty"` // For partitioned datasets
+	MemberName  string `json:"memberName,omitempty"` // For PDS members
 	Content     string `json:"content"`
 	Encoding    string `json:"encoding,omitempty"`
 	Replace     bool   `json:"replace,omitempty"`
 }
 
-// DownloadRequest represents a request to download content from a dataset
+// DownloadRequest represents a request to download content
 type DownloadRequest struct {
 	DatasetName string `json:"datasetName"`
-	MemberName  string `json:"memberName,omitempty"` // For partitioned datasets
+	MemberName  string `json:"memberName,omitempty"` // For PDS members
 	Encoding    string `json:"encoding,omitempty"`
 }
 
@@ -139,7 +139,7 @@ type DatasetFilter struct {
 	Limit  int    `json:"limit,omitempty"`
 }
 
-// DatasetManager interface for dataset management operations
+// DatasetManager interface for dataset operations
 type DatasetManager interface {
 	// Basic operations
 	ListDatasets(filter *DatasetFilter) (*DatasetList, error)
@@ -152,7 +152,7 @@ type DatasetManager interface {
 	UploadContent(request *UploadRequest) error
 	DownloadContent(request *DownloadRequest) (string, error)
 	
-	// Member operations (for partitioned datasets)
+	// Member operations (for PDS)
 	ListMembers(datasetName string) (*MemberList, error)
 	GetMember(datasetName, memberName string) (*DatasetMember, error)
 	DeleteMember(datasetName, memberName string) error

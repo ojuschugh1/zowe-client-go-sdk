@@ -5,7 +5,7 @@ import (
 	"os"
 )
 
-// CreateZOSMFProfile creates a new ZOSMF profile with the given parameters
+// CreateZOSMFProfile creates a ZOSMF profile with the given parameters
 func CreateZOSMFProfile(name, host string, port int, user, password string) *ZOSMFProfile {
 	return &ZOSMFProfile{
 		Name:               name,
@@ -19,7 +19,7 @@ func CreateZOSMFProfile(name, host string, port int, user, password string) *ZOS
 	}
 }
 
-// CreateZOSMFProfileWithOptions creates a new ZOSMF profile with additional options
+// CreateZOSMFProfileWithOptions creates a ZOSMF profile with extra options
 func CreateZOSMFProfileWithOptions(name, host string, port int, user, password string, rejectUnauthorized bool, basePath string) *ZOSMFProfile {
 	return &ZOSMFProfile{
 		Name:               name,
@@ -33,7 +33,7 @@ func CreateZOSMFProfileWithOptions(name, host string, port int, user, password s
 	}
 }
 
-// CreateSessionDirect creates a session directly with connection parameters
+// CreateSessionDirect creates a session with connection details
 func CreateSessionDirect(host string, port int, user, password string) (*Session, error) {
 	profile := &ZOSMFProfile{
 		Host:               host,

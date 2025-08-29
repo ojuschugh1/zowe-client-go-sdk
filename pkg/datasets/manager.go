@@ -12,34 +12,34 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// API endpoint constants and templates aligned to z/OSMF dataset APIs
+// z/OSMF dataset API endpoints
 const (
-	// Collection endpoints
+	// Main datasets endpoint
 	DatasetsEndpoint = "/restfiles/ds"
 	
-	// Resource templates
+	// Dataset by name
 	DatasetByNameEndpoint = "/restfiles/ds/%s"
 	
-	// Sub-resources
-	MembersEndpoint  = "/member"  // Fixed: was "/members", should be "/member" per z/OSMF API
+	// Member endpoints
+	MembersEndpoint  = "/member"
 	ContentEndpoint  = "/content"
 	
-	// Member-specific endpoints
-	MemberByNameEndpoint = "/member/%s"  // Fixed: was "/members/%s", should be "/member/%s" per z/OSMF API
+	// Member by name
+	MemberByNameEndpoint = "/member/%s"
 	
 	// Content endpoints
 	DatasetContentEndpoint = "/content"
 	MemberContentEndpoint  = "/content/%s"
 )
 
-// NewDatasetManager creates a new dataset manager using a session
+// NewDatasetManager creates a dataset manager with the given session
 func NewDatasetManager(session *profile.Session) *ZOSMFDatasetManager {
 	return &ZOSMFDatasetManager{
 		session: session,
 	}
 }
 
-// NewDatasetManagerFromProfile creates a new dataset manager from a profile
+// NewDatasetManagerFromProfile creates a dataset manager from a profile
 func NewDatasetManagerFromProfile(profile *profile.ZOSMFProfile) (*ZOSMFDatasetManager, error) {
 	session, err := profile.NewSession()
 	if err != nil {
@@ -48,39 +48,38 @@ func NewDatasetManagerFromProfile(profile *profile.ZOSMFProfile) (*ZOSMFDatasetM
 	return NewDatasetManager(session), nil
 }
 
-// ListDatasets retrieves a list of datasets based on the provided filter
+// ListDatasets gets datasets matching the filter
 func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build query parameters according to z/OSMF API documentation
+	// Build query parameters
 	params := url.Values{}
 	
-	// z/OSMF requires either dslevel or volser parameter - provide default if none specified
+	// Need either dslevel or volser parameter
 	hasRequiredParam := false
 	
 	if filter != nil {
 		if filter.Name != "" {
-			// Use dslevel parameter for dataset name pattern (supports wildcards)
+			// Dataset name pattern (wildcards supported)
 			params.Set("dslevel", filter.Name)
 			hasRequiredParam = true
 		}
 		if filter.Volume != "" {
-			// Use volser parameter for volume serial
+			// Volume serial number
 			params.Set("volser", filter.Volume)
 			hasRequiredParam = true
 		}
 		if filter.Owner != "" {
-			// Use start parameter for pagination (dataset name to start from)
+			// Starting dataset name for pagination
 			params.Set("start", filter.Owner)
 		}
-		// Note: Limit is handled via X-IBM-Max-Items header, not query parameter
-		// Note: Type/dsorg filtering is not supported in z/OSMF list datasets API
+		// Limit is handled via header, not query param
 	}
 	
-	// If no required parameter (dslevel or volser) is provided, use a user-specific pattern
+	// Default to user's datasets if no filter specified
 	if !hasRequiredParam {
-		// Use the user ID from the session as default pattern to avoid overly broad searches
-		params.Set("dslevel", session.User+".*") // List datasets starting with user ID
+		// Use user ID to avoid listing everything
+		params.Set("dslevel", session.User+".*")
 	}
 
 	// Build URL
@@ -100,15 +99,14 @@ func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList
 		req.Header.Set(key, value)
 	}
 	
-	// Set X-IBM-Max-Items header for limiting results (instead of query parameter)
+	// Set result limit
 	if filter != nil && filter.Limit > 0 {
 		req.Header.Set("X-IBM-Max-Items", strconv.Itoa(filter.Limit))
 	} else {
-		// Set to 0 to return all items by default
-		req.Header.Set("X-IBM-Max-Items", "0")
+		req.Header.Set("X-IBM-Max-Items", "0") // 0 = no limit
 	}
 	
-	// Set X-IBM-Attributes header to specify what attributes to return
+	// Get basic attributes only
 	req.Header.Set("X-IBM-Attributes", "base")
 
 	// Make request
@@ -138,17 +136,15 @@ func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList
 	return &datasetList, nil
 }
 
-// GetDataset retrieves detailed information about a specific dataset
-// Note: The individual dataset API returns binary content, not JSON metadata
-// Use ListDatasets with a specific filter to get dataset metadata instead
+// GetDataset gets info for a specific dataset
 func (dm *ZOSMFDatasetManager) GetDataset(name string) (*Dataset, error) {
-	// Use the list API to get dataset metadata
+	// Use list API to get metadata
 	dl, err := dm.ListDatasets(&DatasetFilter{Name: name})
 	if err != nil {
 		return nil, err
 	}
 	
-	// Find the specific dataset in the results
+	// Find the dataset in results
 	for _, ds := range dl.Datasets {
 		if ds.Name == name {
 			return &ds, nil
@@ -158,29 +154,26 @@ func (dm *ZOSMFDatasetManager) GetDataset(name string) (*Dataset, error) {
 	return nil, fmt.Errorf("dataset not found: %s", name)
 }
 
-// GetDatasetInfo retrieves detailed information about a specific dataset
-// This method first tries the direct API call, and if that fails, falls back to the list API approach
+// GetDatasetInfo gets detailed dataset info, trying direct API first
 func (dm *ZOSMFDatasetManager) GetDatasetInfo(name string) (*Dataset, error) {
-	// First try the direct API approach
+	// Try direct API first
 	dataset, err := dm.getDatasetInfoDirect(name)
 	if err == nil {
 		return dataset, nil
 	}
 	
-	// If direct API fails, fall back to the existing GetDataset method
-	// which uses the list API with a filter
+	// Fall back to list API
 	return dm.GetDataset(name)
 }
 
-// getDatasetInfoDirect attempts to retrieve dataset info using direct API call
-// This is a private method that may not work in all z/OSMF environments
+// getDatasetInfoDirect tries to get dataset info via direct API
 func (dm *ZOSMFDatasetManager) getDatasetInfoDirect(name string) (*Dataset, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL for direct dataset info retrieval
+	// Build URL for direct dataset access
 	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(name))
 	
-	// Add query parameter to request metadata instead of content
+	// Request metadata, not content
 	params := url.Values{}
 	params.Set("metadata", "true")
 	apiURL += "?" + params.Encode()

@@ -8,7 +8,7 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// parseCorrelator parses a correlator in the format "jobname:jobid" into separate components
+// parseCorrelator parses "jobname:jobid" into separate parts
 func parseCorrelator(correlator string) (jobName, jobID string, err error) {
 	parts := strings.Split(correlator, ":")
 	if len(parts) != 2 {
@@ -17,7 +17,7 @@ func parseCorrelator(correlator string) (jobName, jobID string, err error) {
 	return parts[0], parts[1], nil
 }
 
-// CreateJobManager creates a new job manager from a profile manager
+// CreateJobManager creates a job manager from a profile manager
 func CreateJobManager(pm *profile.ZOSMFProfileManager, profileName string) (*ZOSMFJobManager, error) {
 	zosmfProfile, err := pm.GetZOSMFProfile(profileName)
 	if err != nil {
@@ -32,7 +32,7 @@ func CreateJobManager(pm *profile.ZOSMFProfileManager, profileName string) (*ZOS
 	return NewJobManager(session), nil
 }
 
-// CreateJobManagerDirect creates a job manager directly with connection parameters
+// CreateJobManagerDirect creates a job manager with connection details
 func CreateJobManagerDirect(host string, port int, user, password string) (*ZOSMFJobManager, error) {
 	session, err := profile.CreateSessionDirect(host, port, user, password)
 	if err != nil {
@@ -42,7 +42,7 @@ func CreateJobManagerDirect(host string, port int, user, password string) (*ZOSM
 	return NewJobManager(session), nil
 }
 
-// CreateJobManagerDirectWithOptions creates a job manager with additional options
+// CreateJobManagerDirectWithOptions creates a job manager with extra options
 func CreateJobManagerDirectWithOptions(host string, port int, user, password string, rejectUnauthorized bool, basePath string) (*ZOSMFJobManager, error) {
 	session, err := profile.CreateSessionDirectWithOptions(host, port, user, password, rejectUnauthorized, basePath)
 	if err != nil {

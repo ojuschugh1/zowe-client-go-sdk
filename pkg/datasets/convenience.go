@@ -9,7 +9,7 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// CreateDatasetManager creates a new dataset manager from a profile manager
+// CreateDatasetManager creates a dataset manager from a profile manager
 func CreateDatasetManager(pm *profile.ZOSMFProfileManager, profileName string) (*ZOSMFDatasetManager, error) {
 	zosmfProfile, err := pm.GetZOSMFProfile(profileName)
 	if err != nil {
@@ -24,7 +24,7 @@ func CreateDatasetManager(pm *profile.ZOSMFProfileManager, profileName string) (
 	return NewDatasetManager(session), nil
 }
 
-// CreateDatasetManagerDirect creates a dataset manager directly with connection parameters
+// CreateDatasetManagerDirect creates a dataset manager with connection details
 func CreateDatasetManagerDirect(host string, port int, user, password string) (*ZOSMFDatasetManager, error) {
 	session, err := profile.CreateSessionDirect(host, port, user, password)
 	if err != nil {
@@ -34,7 +34,7 @@ func CreateDatasetManagerDirect(host string, port int, user, password string) (*
 	return NewDatasetManager(session), nil
 }
 
-// CreateDatasetManagerDirectWithOptions creates a dataset manager with additional options
+// CreateDatasetManagerDirectWithOptions creates a dataset manager with extra options
 func CreateDatasetManagerDirectWithOptions(host string, port int, user, password string, rejectUnauthorized bool, basePath string) (*ZOSMFDatasetManager, error) {
 	session, err := profile.CreateSessionDirectWithOptions(host, port, user, password, rejectUnauthorized, basePath)
 	if err != nil {
@@ -44,7 +44,7 @@ func CreateDatasetManagerDirectWithOptions(host string, port int, user, password
 	return NewDatasetManager(session), nil
 }
 
-// CreateSequentialDataset creates a sequential dataset with default parameters
+// CreateSequentialDataset creates a sequential dataset with defaults
 func (dm *ZOSMFDatasetManager) CreateSequentialDataset(name string) error {
 	request := &CreateDatasetRequest{
 		Name: name,
@@ -61,7 +61,7 @@ func (dm *ZOSMFDatasetManager) CreateSequentialDataset(name string) error {
 	return dm.CreateDataset(request)
 }
 
-// CreatePartitionedDataset creates a partitioned dataset with default parameters
+// CreatePartitionedDataset creates a partitioned dataset with defaults
 func (dm *ZOSMFDatasetManager) CreatePartitionedDataset(name string) error {
 	request := &CreateDatasetRequest{
 		Name: name,
@@ -80,7 +80,7 @@ func (dm *ZOSMFDatasetManager) CreatePartitionedDataset(name string) error {
 	return dm.CreateDataset(request)
 }
 
-// CreateDatasetWithOptions creates a dataset with custom parameters
+// CreateDatasetWithOptions creates a dataset with custom settings
 func (dm *ZOSMFDatasetManager) CreateDatasetWithOptions(name string, datasetType DatasetType, space Space, recordFormat RecordFormat, recordLength RecordLength, blockSize BlockSize) error {
 	request := &CreateDatasetRequest{
 		Name:         name,
@@ -91,7 +91,7 @@ func (dm *ZOSMFDatasetManager) CreateDatasetWithOptions(name string, datasetType
 		BlockSize:    blockSize,
 	}
 	if datasetType == DatasetTypePartitioned && space.Directory == 0 {
-		request.Directory = 5 // Default directory blocks for partitioned datasets
+		request.Directory = 5 // Default directory blocks for PDS
 	}
 	return dm.CreateDataset(request)
 }

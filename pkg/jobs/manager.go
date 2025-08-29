@@ -13,35 +13,35 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// API endpoint constants and templates based on z/OSMF docs
+// z/OSMF job API endpoints
 const (
-	// Collection endpoints
+	// Main jobs endpoint
 	JobsEndpoint = "/restjobs/jobs"
 
-	// Resource templates
+	// Job by name and ID
 	JobByNameIDEndpoint     = "/restjobs/jobs/%s/%s" // jobname/jobid
 	JobByCorrelatorEndpoint = "/restjobs/jobs/%s"    // correlator
 
-	// Sub-resources
+	// Job operations
 	FilesEndpoint   = "/files"
 	CancelEndpoint  = "/cancel"
 	PurgeEndpoint   = "/purge"
 	RecordsEndpoint = "/records"
 	
-	// File-specific endpoints
+	// File operations
 	JobFilesEndpoint        = "/files"
 	JobFilesByIDEndpoint    = "/files/%s/records"
 	JobFilesJCLEndpoint     = "/files/JCL/records"
 )
 
-// NewJobManager creates a new job manager using a session
+// NewJobManager creates a job manager with the given session
 func NewJobManager(session *profile.Session) *ZOSMFJobManager {
 	return &ZOSMFJobManager{
 		session: session,
 	}
 }
 
-// NewJobManagerFromProfile creates a new job manager from a profile
+// NewJobManagerFromProfile creates a job manager from a profile
 func NewJobManagerFromProfile(profile *profile.ZOSMFProfile) (*ZOSMFJobManager, error) {
 	session, err := profile.NewSession()
 	if err != nil {
@@ -50,7 +50,7 @@ func NewJobManagerFromProfile(profile *profile.ZOSMFProfile) (*ZOSMFJobManager, 
 	return NewJobManager(session), nil
 }
 
-// ListJobs retrieves a list of jobs based on the provided filter
+// ListJobs gets jobs matching the filter
 func (jm *ZOSMFJobManager) ListJobs(filter *JobFilter) (*JobList, error) {
 	session := jm.session.(*profile.Session)
 	
