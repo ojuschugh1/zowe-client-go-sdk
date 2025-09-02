@@ -34,7 +34,7 @@ import (
     "fmt"
     "log"
     
-    "github.com/zowe/zowe-client-go-sdk/pkg/profile"
+    "github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
 func main() {
