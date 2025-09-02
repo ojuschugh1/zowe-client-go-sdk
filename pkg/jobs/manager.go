@@ -8,39 +8,40 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// API endpoint constants and templates based on z/OSMF docs
+// z/OSMF job API endpoints
 const (
-	// Collection endpoints
+	// Main jobs endpoint
 	JobsEndpoint = "/restjobs/jobs"
 
-	// Resource templates
+	// Job by name and ID
 	JobByNameIDEndpoint     = "/restjobs/jobs/%s/%s" // jobname/jobid
 	JobByCorrelatorEndpoint = "/restjobs/jobs/%s"    // correlator
 
-	// Sub-resources
+	// Job operations
 	FilesEndpoint   = "/files"
 	CancelEndpoint  = "/cancel"
 	PurgeEndpoint   = "/purge"
 	RecordsEndpoint = "/records"
 	
-	// File-specific endpoints
+	// File operations
 	JobFilesEndpoint        = "/files"
 	JobFilesByIDEndpoint    = "/files/%s/records"
 	JobFilesJCLEndpoint     = "/files/JCL/records"
 )
 
-// NewJobManager creates a new job manager using a session
+// NewJobManager creates a job manager with the given session
 func NewJobManager(session *profile.Session) *ZOSMFJobManager {
 	return &ZOSMFJobManager{
 		session: session,
 	}
 }
 
-// NewJobManagerFromProfile creates a new job manager from a profile
+// NewJobManagerFromProfile creates a job manager from a profile
 func NewJobManagerFromProfile(profile *profile.ZOSMFProfile) (*ZOSMFJobManager, error) {
 	session, err := profile.NewSession()
 	if err != nil {
@@ -49,7 +50,7 @@ func NewJobManagerFromProfile(profile *profile.ZOSMFProfile) (*ZOSMFJobManager, 
 	return NewJobManager(session), nil
 }
 
-// ListJobs retrieves a list of jobs based on the provided filter
+// ListJobs gets jobs matching the filter
 func (jm *ZOSMFJobManager) ListJobs(filter *JobFilter) (*JobList, error) {
 	session := jm.session.(*profile.Session)
 	
@@ -127,52 +128,52 @@ func (jm *ZOSMFJobManager) ListJobs(filter *JobFilter) (*JobList, error) {
 	return nil, fmt.Errorf("failed to decode response: %s", string(bodyBytes))
 }
 
-// GetJob retrieves detailed information about a specific job by correlator
+// GetJob retrieves detailed information about a specific job by correlator or job ID
 func (jm *ZOSMFJobManager) GetJob(correlator string) (*Job, error) {
-	session := jm.session.(*profile.Session)
+	// Check if it's already in correlator format (jobname:jobid)
+	if strings.Contains(correlator, ":") {
+		// Parse correlator to get jobname and jobid
+		jobName, jobID, err := parseCorrelator(correlator)
+		if err != nil {
+			return nil, fmt.Errorf("invalid correlator format: %w", err)
+		}
+		return jm.GetJobByNameID(jobName, jobID)
+	}
 	
-	// Build URL using correlator
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator))
-
-	// Create request
-	req, err := http.NewRequest("GET", apiURL, nil)
+	// If it's just a job ID, we need to find the job first
+	// List jobs and find the one with this job ID
+	jobFilter := &JobFilter{
+		JobID: correlator,
+		MaxJobs: 100, // Get more jobs to find the one we need
+	}
+	
+	jobList, err := jm.ListJobs(jobFilter)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return nil, fmt.Errorf("failed to find job with ID %s: %w", correlator, err)
 	}
-
-	// Add headers
-	for key, value := range session.GetHeaders() {
-		req.Header.Set(key, value)
+	
+	// Find the job with the specified job ID
+	for _, job := range jobList.Jobs {
+		if job.JobID == correlator {
+			return jm.GetJobByNameID(job.JobName, job.JobID)
+		}
 	}
-
-	// Make request
-	resp, err := session.GetHTTPClient().Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("failed to make request: %w", err)
-	}
-	defer resp.Body.Close()
-
-	// Check response status
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
-	}
-
-	// Parse response
-	var job Job
-	if err := json.NewDecoder(resp.Body).Decode(&job); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
-	}
-
-	return &job, nil
+	
+	return nil, fmt.Errorf("job with ID %s not found", correlator)
 }
 
 // GetJobInfo retrieves job information
 func (jm *ZOSMFJobManager) GetJobInfo(correlator string) (*JobInfo, error) {
+	// Parse correlator to get jobname and jobid
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid correlator format: %w", err)
+	}
+	
 	session := jm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + JobFilesEndpoint
+	// Build URL using jobname/jobid format
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByNameIDEndpoint, url.PathEscape(jobName), url.PathEscape(jobID)) + JobFilesEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -279,44 +280,56 @@ func (jm *ZOSMFJobManager) SubmitJob(request *SubmitJobRequest) (*SubmitJobRespo
 	// Build URL
 	apiURL := session.GetBaseURL() + JobsEndpoint
 
-	// Prepare request body
-	var requestBody interface{}
+	// Prepare request body and content type based on submission type
+	var requestBody []byte
+	var contentType string
+	var err error
+	
 	if request.JobStatement != "" {
-		// Submit job statement
-		requestBody = map[string]string{
-			"jobStatement": request.JobStatement,
-		}
+		// Submit job statement as plain text (z/OSMF expects JCL as text/plain for direct submission)
+		requestBody = []byte(request.JobStatement)
+		contentType = "text/plain"
 	} else if request.JobDataSet != "" {
-		// Submit job from dataset
-		requestBody = map[string]string{
-			"jobDataSet": request.JobDataSet,
+		// Submit job from dataset using JSON format
+		// z/OSMF expects the dataset name to be prefixed with "//" for absolute path
+		datasetPath := request.JobDataSet
+		if !strings.HasPrefix(datasetPath, "//") {
+			datasetPath = "//" + datasetPath
+		}
+		
+		body := map[string]interface{}{
+			"file": datasetPath,
 		}
 		if request.Volume != "" {
-			requestBody.(map[string]string)["volume"] = request.Volume
+			body["volume"] = request.Volume
 		}
+		requestBody, err = json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal dataset job request: %w", err)
+		}
+		contentType = "application/json"
 	} else if request.JobLocalFile != "" {
-		// Submit job from local file
-		requestBody = map[string]string{
-			"jobLocalFile": request.JobLocalFile,
+		// Submit job from local file using JSON format
+		body := map[string]interface{}{
+			"file": request.JobLocalFile,
 		}
 		if request.Directory != "" {
-			requestBody.(map[string]string)["directory"] = request.Directory
+			body["directory"] = request.Directory
 		}
 		if request.Extension != "" {
-			requestBody.(map[string]string)["extension"] = request.Extension
+			body["extension"] = request.Extension
 		}
+		requestBody, err = json.Marshal(body)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal local file job request: %w", err)
+		}
+		contentType = "application/json"
 	} else {
 		return nil, fmt.Errorf("no job source specified (jobStatement, jobDataSet, or jobLocalFile)")
 	}
 
-	// Serialize request body
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
 	// Create request (use PUT per z/OSMF documentation)
-	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
+	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(requestBody))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -325,6 +338,7 @@ func (jm *ZOSMFJobManager) SubmitJob(request *SubmitJobRequest) (*SubmitJobRespo
 	for key, value := range session.GetHeaders() {
 		req.Header.Set(key, value)
 	}
+	req.Header.Set("Content-Type", contentType)
 
 	// Make request
 	resp, err := session.GetHTTPClient().Do(req)
@@ -382,12 +396,23 @@ func (jm *ZOSMFJobManager) CancelJob(correlator string) error {
 	return nil
 }
 
-// DeleteJob deletes a job
+// DeleteJob deletes a job using correlator format (jobname:jobid)
 func (jm *ZOSMFJobManager) DeleteJob(correlator string) error {
+	// Parse correlator to get jobname and jobid
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return fmt.Errorf("invalid correlator format: %w", err)
+	}
+	
+	return jm.DeleteJobByNameID(jobName, jobID)
+}
+
+// DeleteJobByNameID deletes a job using separate jobName and jobID
+func (jm *ZOSMFJobManager) DeleteJobByNameID(jobName, jobID string) error {
 	session := jm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator))
+	// Build URL using jobName and jobID format
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByNameIDEndpoint, url.PathEscape(jobName), url.PathEscape(jobID))
 
 	// Create request
 	req, err := http.NewRequest("DELETE", apiURL, nil)
@@ -416,12 +441,12 @@ func (jm *ZOSMFJobManager) DeleteJob(correlator string) error {
 	return nil
 }
 
-// GetSpoolFiles retrieves spool files for a job
-func (jm *ZOSMFJobManager) GetSpoolFiles(correlator string) ([]SpoolFile, error) {
+// GetSpoolFiles retrieves spool files for a job using jobname and jobid
+func (jm *ZOSMFJobManager) GetSpoolFiles(jobName, jobID string) ([]SpoolFile, error) {
 	session := jm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + JobFilesEndpoint
+	// Build URL using the correct z/OSMF format: /restjobs/jobs/{jobname}/{jobid}/files
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByNameIDEndpoint, url.PathEscape(jobName), url.PathEscape(jobID)) + JobFilesEndpoint
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -457,11 +482,11 @@ func (jm *ZOSMFJobManager) GetSpoolFiles(correlator string) ([]SpoolFile, error)
 }
 
 // GetSpoolFileContent retrieves the content of a specific spool file
-func (jm *ZOSMFJobManager) GetSpoolFileContent(correlator string, spoolID int) (string, error) {
+func (jm *ZOSMFJobManager) GetSpoolFileContent(jobName, jobID string, spoolID int) (string, error) {
 	session := jm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByCorrelatorEndpoint, url.PathEscape(correlator)) + fmt.Sprintf(JobFilesByIDEndpoint, strconv.Itoa(spoolID))
+	// Build URL using the correct z/OSMF format: /restjobs/jobs/{jobname}/{jobid}/files/{id}/records
+	apiURL := session.GetBaseURL() + fmt.Sprintf(JobByNameIDEndpoint, url.PathEscape(jobName), url.PathEscape(jobID)) + fmt.Sprintf(JobFilesByIDEndpoint, strconv.Itoa(spoolID))
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -495,6 +520,28 @@ func (jm *ZOSMFJobManager) GetSpoolFileContent(correlator string, spoolID int) (
 
 	return string(body), nil
 }
+
+// GetSpoolFilesByCorrelator retrieves spool files for a job using correlator format (jobname:jobid)
+// This is a convenience method that maintains backward compatibility
+func (jm *ZOSMFJobManager) GetSpoolFilesByCorrelator(correlator string) ([]SpoolFile, error) {
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return nil, fmt.Errorf("invalid correlator format: %w", err)
+	}
+	return jm.GetSpoolFiles(jobName, jobID)
+}
+
+// GetSpoolFileContentByCorrelator retrieves the content of a specific spool file using correlator format
+// This is a convenience method that maintains backward compatibility
+func (jm *ZOSMFJobManager) GetSpoolFileContentByCorrelator(correlator string, spoolID int) (string, error) {
+	jobName, jobID, err := parseCorrelator(correlator)
+	if err != nil {
+		return "", fmt.Errorf("invalid correlator format: %w", err)
+	}
+	return jm.GetSpoolFileContent(jobName, jobID, spoolID)
+}
+
+
 
 // PurgeJob purges a job (removes it from the system)
 func (jm *ZOSMFJobManager) PurgeJob(correlator string) error {

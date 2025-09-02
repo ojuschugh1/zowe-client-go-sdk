@@ -242,14 +242,6 @@ jobs:
 2. Check the Actions tab to see test results
 3. Monitor the logs for any issues
 
-## Step 7: Next Steps
-
-Once GitHub Actions testing is successful:
-
-1. **Share results** with your team
-2. **Set up additional test scenarios** as needed
-3. **Integrate with your CI/CD pipeline**
-4. **Document any zXplore-specific requirements**
 
 ## Security Notes
 
@@ -260,8 +252,8 @@ Once GitHub Actions testing is successful:
 
 ## Support
 
-If you encounter issues:
-1. Check the zXplore documentation
+If you encounter issues: 
+1. Check the zXplore documentation -: https://www.ibm.com/docs/en/zos
 2. Contact zXplore support
 3. Review the SDK documentation
 4. Check the test output for specific error messages

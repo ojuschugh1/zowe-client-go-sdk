@@ -8,9 +8,9 @@ import (
 	"time"
 )
 
-// NewSession creates a new session from a ZOSMF profile
+// NewSession creates a session from a ZOSMF profile
 func (p *ZOSMFProfile) NewSession() (*Session, error) {
-	// Create HTTP client with TLS configuration
+	// Set up HTTP client with TLS config
 	tlsConfig := &tls.Config{
 		InsecureSkipVerify: !p.RejectUnauthorized,
 	}
@@ -24,7 +24,7 @@ func (p *ZOSMFProfile) NewSession() (*Session, error) {
 		Timeout:   30 * time.Second,
 	}
 	
-	// Build base URL
+	// Figure out protocol and build base URL
 	protocol := p.Protocol
 	if protocol == "" {
 		protocol = "https"
@@ -40,18 +40,18 @@ func (p *ZOSMFProfile) NewSession() (*Session, error) {
 		baseURL += ":" + fmt.Sprintf("%d", p.Port)
 	}
 
-	// Default BasePath to /zosmf if not specified
+	// Add base path (default to /zosmf)
 	basePath := p.BasePath
 	if basePath == "" {
 		basePath = "/zosmf"
 	}
-	// Ensure leading slash
+	// Make sure it starts with /
 	if basePath[0] != '/' {
 		basePath = "/" + basePath
 	}
 	baseURL += basePath
 	
-	// Set default headers
+	// Set up default headers
 	headers := map[string]string{
 		"Content-Type": "application/json",
 		"Accept":       "application/json",

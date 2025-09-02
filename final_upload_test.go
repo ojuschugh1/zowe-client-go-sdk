@@ -20,7 +20,7 @@ func main() {
 	password := os.Getenv("ZXPLORE_PASSWORD")
 
 	if host == "" || port == "" || user == "" || password == "" {
-		log.Fatal("❌ Missing required environment variables")
+		log.Fatal(" Missing required environment variables")
 	}
 
 	cfg := &profile.ZOSMFProfile{
@@ -44,43 +44,43 @@ func main() {
 
 	sess, err := cfg.NewSession()
 	if err != nil {
-		log.Fatalf("❌ Failed to create session: %v", err)
+		log.Fatalf(" Failed to create session: %v", err)
 	}
 
 	testsPassed := 0
 	totalTests := 0
 
 	// Test Jobs API
-	fmt.Println("📋 TESTING JOBS API")
+	fmt.Println(" TESTING JOBS API")
 	fmt.Println("==================")
 	
 	jm := jobs.NewJobManager(sess)
 
 	totalTests++
-	fmt.Print("🧪 List jobs... ")
+	fmt.Print(" List jobs... ")
 	jl, err := jm.ListJobs(&jobs.JobFilter{MaxJobs: 3})
 	if err != nil {
-		fmt.Printf("❌ FAILED: %v\n", err)
+		fmt.Printf(" FAILED: %v\n", err)
 	} else {
-		fmt.Printf("✅ PASSED: Found %d jobs\n", len(jl.Jobs))
+		fmt.Printf(" PASSED: Found %d jobs\n", len(jl.Jobs))
 		testsPassed++
 	}
 
 	fmt.Println()
 
 	// Test Datasets API
-	fmt.Println("🗂️  TESTING DATASETS API")
+	fmt.Println("  TESTING DATASETS API")
 	fmt.Println("========================")
 
 	dm := datasets.NewDatasetManager(sess)
 
 	totalTests++
-	fmt.Print("🧪 List user datasets... ")
+	fmt.Print("List user datasets... ")
 	dl, err := dm.ListDatasets(&datasets.DatasetFilter{Name: user + ".*", Limit: 5})
 	if err != nil {
-		fmt.Printf("❌ FAILED: %v\n", err)
+		fmt.Printf(" FAILED: %v\n", err)
 	} else {
-		fmt.Printf("✅ PASSED: Found %d datasets\n", len(dl.Datasets))
+		fmt.Printf(" PASSED: Found %d datasets\n", len(dl.Datasets))
 		testsPassed++
 	}
 
@@ -98,54 +98,54 @@ func main() {
 	fmt.Println()
 
 	// Test Members API (All Fixed)
-	fmt.Println("📂 TESTING MEMBERS API (ALL FIXED)")
+	fmt.Println(" TESTING MEMBERS API (ALL FIXED)")
 	fmt.Println("==================================")
 
 	if pdsName != "" {
 		totalTests++
-		fmt.Printf("🧪 List members of PDS %s... ", pdsName)
+		fmt.Printf(" List members of PDS %s... ", pdsName)
 		members, err := dm.ListMembers(pdsName)
 		if err != nil {
-			fmt.Printf("❌ FAILED: %v\n", err)
+			fmt.Printf(" FAILED: %v\n", err)
 		} else {
-			fmt.Printf("✅ PASSED: Found %d members\n", len(members.Members))
+			fmt.Printf(" PASSED: Found %d members\n", len(members.Members))
 			testsPassed++
 
-			// Test member content download (FIXED)
+			// Test member content download 
 			if len(members.Members) > 0 {
 				totalTests++
-				fmt.Printf("🧪 Download member content (%s)... ", members.Members[0].Name)
+				fmt.Printf(" Download member content (%s)... ", members.Members[0].Name)
 				content, err := dm.DownloadTextFromMember(pdsName, members.Members[0].Name)
 				if err != nil {
-					fmt.Printf("❌ FAILED: %v\n", err)
+					fmt.Printf(" FAILED: %v\n", err)
 				} else {
-					fmt.Printf("✅ PASSED: Downloaded %d bytes\n", len(content))
+					fmt.Printf(" PASSED: Downloaded %d bytes\n", len(content))
 					testsPassed++
 				}
 			}
 
-			// Test member content upload (NEWLY FIXED)
+			// Test member content upload 
 			totalTests++
-			fmt.Printf("🧪 Upload member content (FINAL)... ")
+			fmt.Printf(" Upload member content (FINAL)... ")
 			testContent := "//FINAL JOB\n//STEP1 EXEC PGM=IEFBR14\n/*\n"
 			err = dm.UploadTextToMember(pdsName, "FINAL", testContent)
 			if err != nil {
-				fmt.Printf("❌ FAILED: %v\n", err)
+				fmt.Printf(" FAILED: %v\n", err)
 			} else {
-				fmt.Printf("✅ PASSED: Uploaded %d bytes\n", len(testContent))
+				fmt.Printf(" PASSED: Uploaded %d bytes\n", len(testContent))
 				testsPassed++
 
 				// Verify upload by downloading back
 				totalTests++
-				fmt.Printf("🧪 Verify upload by downloading... ")
+				fmt.Printf(" Verify upload by downloading... ")
 				verifyContent, err := dm.DownloadTextFromMember(pdsName, "FINAL")
 				if err != nil {
-					fmt.Printf("❌ FAILED: %v\n", err)
+					fmt.Printf(" FAILED: %v\n", err)
 				} else if verifyContent == testContent {
-					fmt.Printf("✅ PASSED: Content matches perfectly\n")
+					fmt.Printf(" PASSED: Content matches perfectly\n")
 					testsPassed++
 				} else {
-					fmt.Printf("❌ FAILED: Content mismatch\n")
+					fmt.Printf(" FAILED: Content mismatch\n")
 				}
 			}
 		}
@@ -153,17 +153,17 @@ func main() {
 
 	fmt.Println()
 
-	// Test Convenience Methods (Fixed)
-	fmt.Println("🛠️  TESTING CONVENIENCE METHODS")
+	// Test Convenience Methods
+	fmt.Println("  TESTING CONVENIENCE METHODS")
 	fmt.Println("===============================")
 
 	totalTests++
-	fmt.Printf("🧪 GetDatasetsByOwner... ")
+	fmt.Printf(" GetDatasetsByOwner... ")
 	ownerDS, err := dm.GetDatasetsByOwner(user, 3)
 	if err != nil {
-		fmt.Printf("❌ FAILED: %v\n", err)
+		fmt.Printf(" FAILED: %v\n", err)
 	} else {
-		fmt.Printf("✅ PASSED: Found %d datasets by owner\n", len(ownerDS.Datasets))
+		fmt.Printf(" PASSED: Found %d datasets by owner\n", len(ownerDS.Datasets))
 		testsPassed++
 	}
 
@@ -174,7 +174,7 @@ func main() {
 	_ = dm.CloseDatasetManager()
 
 	// Final Results
-	fmt.Println("📊 FINAL TEST RESULTS")
+	fmt.Println(" FINAL TEST RESULTS")
 	fmt.Println("=====================")
 	fmt.Printf("Total Tests: %d\n", totalTests)
 	fmt.Printf("Passed: %d\n", testsPassed)
@@ -183,20 +183,20 @@ func main() {
 
 	if testsPassed == totalTests {
 		fmt.Println()
-		fmt.Println("🎉 PERFECT! ALL TESTS PASSED!")
+		fmt.Println(" PERFECT! ALL TESTS PASSED!")
 		fmt.Println()
-		fmt.Println("✅ Jobs API: Working")
-		fmt.Println("✅ Datasets API: Working") 
-		fmt.Println("✅ Members Listing: Working")
-		fmt.Println("✅ Member Content Download: Working (FIXED)")
-		fmt.Println("✅ Member Content Upload: Working (FIXED)")
-		fmt.Println("✅ Upload Verification: Working")
-		fmt.Println("✅ GetDatasetsByOwner: Working (FIXED)")
-		fmt.Println("✅ All Core Functionality: COMPLETE")
+		fmt.Println(" Jobs API: Working")
+		fmt.Println(" Datasets API: Working") 
+		fmt.Println(" Members Listing: Working")
+		fmt.Println(" Member Content Download: Working (FIXED)")
+		fmt.Println(" Member Content Upload: Working (FIXED)")
+		fmt.Println(" Upload Verification: Working")
+		fmt.Println(" GetDatasetsByOwner: Working (FIXED)")
+		fmt.Println(" All Core Functionality: COMPLETE")
 		fmt.Println()
-		fmt.Println("🚀 YOUR ZOWE GO SDK IS 100% FUNCTIONAL!")
+		fmt.Println(" YOUR ZOWE GO SDK IS 100% FUNCTIONAL!")
 	} else {
-		fmt.Printf("\n⚠️  %d tests failed. Review above for details.\n", totalTests-testsPassed)
+		fmt.Printf("\n  %d tests failed. Review above for details.\n", totalTests-testsPassed)
 	}
 
 	fmt.Println()

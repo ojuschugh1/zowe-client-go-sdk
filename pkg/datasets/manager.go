@@ -12,34 +12,34 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// API endpoint constants and templates aligned to z/OSMF dataset APIs
+// z/OSMF dataset API endpoints
 const (
-	// Collection endpoints
+	// Main datasets endpoint
 	DatasetsEndpoint = "/restfiles/ds"
 	
-	// Resource templates
+	// Dataset by name
 	DatasetByNameEndpoint = "/restfiles/ds/%s"
 	
-	// Sub-resources
-	MembersEndpoint  = "/member"  // Fixed: was "/members", should be "/member" per z/OSMF API
+	// Member endpoints
+	MembersEndpoint  = "/member"
 	ContentEndpoint  = "/content"
 	
-	// Member-specific endpoints
-	MemberByNameEndpoint = "/member/%s"  // Fixed: was "/members/%s", should be "/member/%s" per z/OSMF API
+	// Member by name
+	MemberByNameEndpoint = "/member/%s"
 	
 	// Content endpoints
 	DatasetContentEndpoint = "/content"
 	MemberContentEndpoint  = "/content/%s"
 )
 
-// NewDatasetManager creates a new dataset manager using a session
+// NewDatasetManager creates a dataset manager with the given session
 func NewDatasetManager(session *profile.Session) *ZOSMFDatasetManager {
 	return &ZOSMFDatasetManager{
 		session: session,
 	}
 }
 
-// NewDatasetManagerFromProfile creates a new dataset manager from a profile
+// NewDatasetManagerFromProfile creates a dataset manager from a profile
 func NewDatasetManagerFromProfile(profile *profile.ZOSMFProfile) (*ZOSMFDatasetManager, error) {
 	session, err := profile.NewSession()
 	if err != nil {
@@ -48,27 +48,38 @@ func NewDatasetManagerFromProfile(profile *profile.ZOSMFProfile) (*ZOSMFDatasetM
 	return NewDatasetManager(session), nil
 }
 
-// ListDatasets retrieves a list of datasets based on the provided filter
+// ListDatasets gets datasets matching the filter
 func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build query parameters according to z/OSMF API documentation
+	// Build query parameters
 	params := url.Values{}
+	
+	// Need either dslevel or volser parameter
+	hasRequiredParam := false
+	
 	if filter != nil {
 		if filter.Name != "" {
-			// Use dslevel parameter for dataset name pattern (supports wildcards)
+			// Dataset name pattern (wildcards supported)
 			params.Set("dslevel", filter.Name)
+			hasRequiredParam = true
 		}
 		if filter.Volume != "" {
-			// Use volser parameter for volume serial
+			// Volume serial number
 			params.Set("volser", filter.Volume)
+			hasRequiredParam = true
 		}
 		if filter.Owner != "" {
-			// Use start parameter for pagination (dataset name to start from)
+			// Starting dataset name for pagination
 			params.Set("start", filter.Owner)
 		}
-		// Note: Limit is handled via X-IBM-Max-Items header, not query parameter
-		// Note: Type/dsorg filtering is not supported in z/OSMF list datasets API
+		// Limit is handled via header, not query param
+	}
+	
+	// Default to user's datasets if no filter specified
+	if !hasRequiredParam {
+		// Use user ID to avoid listing everything
+		params.Set("dslevel", session.User+".*")
 	}
 
 	// Build URL
@@ -88,15 +99,14 @@ func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList
 		req.Header.Set(key, value)
 	}
 	
-	// Set X-IBM-Max-Items header for limiting results (instead of query parameter)
+	// Set result limit
 	if filter != nil && filter.Limit > 0 {
 		req.Header.Set("X-IBM-Max-Items", strconv.Itoa(filter.Limit))
 	} else {
-		// Set to 0 to return all items by default
-		req.Header.Set("X-IBM-Max-Items", "0")
+		req.Header.Set("X-IBM-Max-Items", "0") // 0 = no limit
 	}
 	
-	// Set X-IBM-Attributes header to specify what attributes to return
+	// Get basic attributes only
 	req.Header.Set("X-IBM-Attributes", "base")
 
 	// Make request
@@ -126,17 +136,15 @@ func (dm *ZOSMFDatasetManager) ListDatasets(filter *DatasetFilter) (*DatasetList
 	return &datasetList, nil
 }
 
-// GetDataset retrieves detailed information about a specific dataset
-// Note: The individual dataset API returns binary content, not JSON metadata
-// Use ListDatasets with a specific filter to get dataset metadata instead
+// GetDataset gets info for a specific dataset
 func (dm *ZOSMFDatasetManager) GetDataset(name string) (*Dataset, error) {
-	// Use the list API to get dataset metadata
+	// Use list API to get metadata
 	dl, err := dm.ListDatasets(&DatasetFilter{Name: name})
 	if err != nil {
 		return nil, err
 	}
 	
-	// Find the specific dataset in the results
+	// Find the dataset in results
 	for _, ds := range dl.Datasets {
 		if ds.Name == name {
 			return &ds, nil
@@ -146,12 +154,74 @@ func (dm *ZOSMFDatasetManager) GetDataset(name string) (*Dataset, error) {
 	return nil, fmt.Errorf("dataset not found: %s", name)
 }
 
-// CreateDataset creates a new dataset
+// GetDatasetInfo gets detailed dataset info, trying direct API first
+func (dm *ZOSMFDatasetManager) GetDatasetInfo(name string) (*Dataset, error) {
+	// Try direct API first
+	dataset, err := dm.getDatasetInfoDirect(name)
+	if err == nil {
+		return dataset, nil
+	}
+	
+	// Fall back to list API
+	return dm.GetDataset(name)
+}
+
+// getDatasetInfoDirect tries to get dataset info via direct API
+func (dm *ZOSMFDatasetManager) getDatasetInfoDirect(name string) (*Dataset, error) {
+	session := dm.session.(*profile.Session)
+	
+	// Build URL for direct dataset access
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(name))
+	
+	// Request metadata, not content
+	params := url.Values{}
+	params.Set("metadata", "true")
+	apiURL += "?" + params.Encode()
+
+	// Create request
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add headers
+	for key, value := range session.GetHeaders() {
+		req.Header.Set(key, value)
+	}
+	req.Header.Set("Accept", "application/json")
+
+	// Make request
+	resp, err := session.GetHTTPClient().Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode == http.StatusNotFound {
+		return nil, fmt.Errorf("dataset not found: %s", name)
+	}
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	// Try to parse response body as JSON
+	var dataset Dataset
+	if err := json.NewDecoder(resp.Body).Decode(&dataset); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return &dataset, nil
+}
+
+// CreateDataset creates a new dataset using the correct z/OSMF REST API format
+// Based on IBM documentation: POST /zosmf/restfiles/ds/<data-set-name>
 func (dm *ZOSMFDatasetManager) CreateDataset(request *CreateDatasetRequest) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL
-	apiURL := session.GetBaseURL() + DatasetsEndpoint
+	// Build URL using the correct format from IBM documentation
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.Name))
 
 	// Prepare request body
 	requestBody := map[string]interface{}{
@@ -262,8 +332,8 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 		// For members, use dataset(member) format
 		apiURL = session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(request.DatasetName), url.PathEscape(request.MemberName))
 	} else {
-		// For datasets, use the standard endpoint
-		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
+		// For datasets, use the dataset endpoint directly (no /content suffix)
+		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName))
 	}
 
 	var req *http.Request
@@ -273,24 +343,8 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 		// For members, use PUT with plain text content
 		req, err = http.NewRequest("PUT", apiURL, bytes.NewBufferString(request.Content))
 	} else {
-		// For datasets, use POST with JSON (original behavior)
-		requestBody := map[string]interface{}{
-			"content": request.Content,
-		}
-		if request.Encoding != "" {
-			requestBody["encoding"] = request.Encoding
-		}
-		if request.Replace {
-			requestBody["replace"] = true
-		}
-
-		// Serialize request body
-		jsonBody, err := json.Marshal(requestBody)
-		if err != nil {
-			return fmt.Errorf("failed to marshal request body: %w", err)
-		}
-
-		req, err = http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
+		// For datasets, use PUT with plain text content (per z/OSMF API specification)
+		req, err = http.NewRequest("PUT", apiURL, bytes.NewBufferString(request.Content))
 	}
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -301,13 +355,8 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 		req.Header.Set(key, value)
 	}
 	
-	if request.MemberName != "" {
-		// For members, use plain text content type
-		req.Header.Set("Content-Type", "text/plain")
-	} else {
-		// For datasets, use JSON content type
-		req.Header.Set("Content-Type", "application/json")
-	}
+	// For both datasets and members, use plain text content type (per z/OSMF API specification)
+	req.Header.Set("Content-Type", "text/plain")
 
 	// Make request
 	resp, err := session.GetHTTPClient().Do(req)
@@ -317,7 +366,7 @@ func (dm *ZOSMFDatasetManager) UploadContent(request *UploadRequest) error {
 	defer resp.Body.Close()
 
 	// Check response status
-	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
@@ -335,8 +384,8 @@ func (dm *ZOSMFDatasetManager) DownloadContent(request *DownloadRequest) (string
 		// For members, use dataset(member) format
 		apiURL = session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(request.DatasetName), url.PathEscape(request.MemberName))
 	} else {
-		// For datasets, use the standard endpoint
-		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName)) + DatasetContentEndpoint
+		// For datasets, use the dataset endpoint directly (no /content suffix)
+		apiURL = session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(request.DatasetName))
 	}
 
 	// Add query parameters
@@ -425,8 +474,8 @@ func (dm *ZOSMFDatasetManager) ListMembers(datasetName string) (*MemberList, err
 func (dm *ZOSMFDatasetManager) GetMember(datasetName, memberName string) (*DatasetMember, error) {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(datasetName)) + fmt.Sprintf(MemberByNameEndpoint, url.PathEscape(memberName))
+	// Build URL using correct z/OSMF format: /zosmf/restfiles/ds/<dataset-name>(<member-name>)
+	apiURL := session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(datasetName), url.PathEscape(memberName))
 
 	// Create request
 	req, err := http.NewRequest("GET", apiURL, nil)
@@ -452,21 +501,22 @@ func (dm *ZOSMFDatasetManager) GetMember(datasetName, memberName string) (*Datas
 		return nil, fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}
 
-	// Parse response
-	var member DatasetMember
-	if err := json.NewDecoder(resp.Body).Decode(&member); err != nil {
-		return nil, fmt.Errorf("failed to decode response: %w", err)
+	// For member access, z/OSMF returns the member content as text, not JSON
+	// We'll create a DatasetMember with the member name since we can't get metadata
+	// from this endpoint. The member exists if we get a successful response.
+	member := &DatasetMember{
+		Name: memberName,
 	}
 
-	return &member, nil
+	return member, nil
 }
 
 // DeleteMember deletes a member from a partitioned dataset
 func (dm *ZOSMFDatasetManager) DeleteMember(datasetName, memberName string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(datasetName)) + fmt.Sprintf(MemberByNameEndpoint, url.PathEscape(memberName))
+	// Build URL using correct z/OSMF format: /zosmf/restfiles/ds/<dataset-name>(<member-name>)
+	apiURL := session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(datasetName), url.PathEscape(memberName))
 
 	// Create request
 	req, err := http.NewRequest("DELETE", apiURL, nil)
@@ -513,16 +563,20 @@ func (dm *ZOSMFDatasetManager) Exists(name string) (bool, error) {
 	return false, nil
 }
 
-// CopyDataset copies a dataset
-func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error {
+// CopySequentialDataset copies a sequential dataset using the z/OSMF REST API
+// This function handles copying entire datasets (not members)
+func (dm *ZOSMFDatasetManager) CopySequentialDataset(sourceName, targetName string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(sourceName)) + "/copy"
+	// Build URL to the target dataset (z/OSMF format: PUT to target with source in body)
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(targetName))
 
-	// Prepare request body
-	requestBody := map[string]string{
-		"target": targetName,
+	// Prepare request body according to z/OSMF API specification for dataset copy
+	requestBody := map[string]interface{}{
+		"request": "copy",
+		"from-dataset": map[string]string{
+			"dsn": sourceName,
+		},
 	}
 
 	// Serialize request body
@@ -531,8 +585,8 @@ func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error 
 		return fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	// Create request
-	req, err := http.NewRequest("POST", apiURL, bytes.NewBuffer(jsonBody))
+	// Create request (PUT to target dataset, not POST to source/copy)
+	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -559,16 +613,22 @@ func (dm *ZOSMFDatasetManager) CopyDataset(sourceName, targetName string) error 
 	return nil
 }
 
-// RenameDataset renames a dataset
-func (dm *ZOSMFDatasetManager) RenameDataset(oldName, newName string) error {
+// CopyMember copies a member from one partitioned dataset to another using the z/OSMF REST API
+// sourceName should be in format "DATASET.NAME" and sourceMember is the member name
+// targetName should be in format "DATASET.NAME" and targetMember is the member name
+func (dm *ZOSMFDatasetManager) CopyMember(sourceName, sourceMember, targetName, targetMember string) error {
 	session := dm.session.(*profile.Session)
 	
-	// Build URL using template
-	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(oldName)) + "/rename"
+	// Build URL to the target member using correct z/OSMF format: /zosmf/restfiles/ds/<target-dataset>(<target-member>)
+	apiURL := session.GetBaseURL() + fmt.Sprintf("/restfiles/ds/%s(%s)", url.PathEscape(targetName), url.PathEscape(targetMember))
 
-	// Prepare request body
-	requestBody := map[string]string{
-		"newName": newName,
+	// Prepare request body according to z/OSMF API specification for member copy
+	requestBody := map[string]interface{}{
+		"request": "copy",
+		"from-dataset": map[string]string{
+			"dsn":    sourceName,
+			"member": sourceMember,
+		},
 	}
 
 	// Serialize request body
@@ -577,7 +637,7 @@ func (dm *ZOSMFDatasetManager) RenameDataset(oldName, newName string) error {
 		return fmt.Errorf("failed to marshal request body: %w", err)
 	}
 
-	// Create request
+	// Create request (PUT to target member)
 	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
@@ -597,7 +657,56 @@ func (dm *ZOSMFDatasetManager) RenameDataset(oldName, newName string) error {
 	defer resp.Body.Close()
 
 	// Check response status
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusNoContent {
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
+	}
+
+	return nil
+}
+
+// RenameDataset renames a dataset using the z/OSMF REST API
+func (dm *ZOSMFDatasetManager) RenameDataset(oldName, newName string) error {
+	session := dm.session.(*profile.Session)
+	
+	// Build URL to the new dataset name (z/OSMF format: PUT to target with source in body)
+	apiURL := session.GetBaseURL() + fmt.Sprintf(DatasetByNameEndpoint, url.PathEscape(newName))
+
+	// Prepare request body according to z/OSMF API specification
+	requestBody := map[string]interface{}{
+		"request": "rename",
+		"from-dataset": map[string]string{
+			"dsn": oldName,
+		},
+	}
+
+	// Serialize request body
+	jsonBody, err := json.Marshal(requestBody)
+	if err != nil {
+		return fmt.Errorf("failed to marshal request body: %w", err)
+	}
+
+	// Create request (PUT to target dataset, not PUT to source/rename)
+	req, err := http.NewRequest("PUT", apiURL, bytes.NewBuffer(jsonBody))
+	if err != nil {
+		return fmt.Errorf("failed to create request: %w", err)
+	}
+
+	// Add headers
+	for key, value := range session.GetHeaders() {
+		req.Header.Set(key, value)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	// Make request
+	resp, err := session.GetHTTPClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("failed to make request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	// Check response status
+	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("API request failed with status %d: %s", resp.StatusCode, string(body))
 	}

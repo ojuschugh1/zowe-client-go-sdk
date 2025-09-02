@@ -8,7 +8,7 @@ import (
 	"runtime"
 )
 
-// NewProfileManager creates a new profile manager instance
+// NewProfileManager creates a profile manager instance
 func NewProfileManager() *ZOSMFProfileManager {
 	configPath := getZoweConfigPath()
 	return &ZOSMFProfileManager{
@@ -16,27 +16,27 @@ func NewProfileManager() *ZOSMFProfileManager {
 	}
 }
 
-// NewProfileManagerWithPath creates a new profile manager with a custom config path
+// NewProfileManagerWithPath creates a profile manager with custom config path
 func NewProfileManagerWithPath(configPath string) *ZOSMFProfileManager {
 	return &ZOSMFProfileManager{
 		configPath: configPath,
 	}
 }
 
-// GetZOSMFProfile retrieves a ZOSMF profile by name
+// GetZOSMFProfile gets a ZOSMF profile by name
 func (pm *ZOSMFProfileManager) GetZOSMFProfile(name string) (*ZOSMFProfile, error) {
 	config, err := pm.loadConfig()
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// Check if the profile exists
+	// Look for zosmf profile
 	zosmfProfile, exists := config.Profiles["zosmf"]
 	if !exists {
 		return nil, fmt.Errorf("no zosmf profiles found in configuration")
 	}
 
-	// Get the base profile for inheritance
+	// Get base profile for inheritance
 	var baseProfile *BaseProfile
 	if baseProfileData, exists := config.Profiles["global_base"]; exists {
 		baseProfile = pm.parseBaseProfile(baseProfileData)

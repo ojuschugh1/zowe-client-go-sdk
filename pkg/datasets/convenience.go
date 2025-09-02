@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// CreateDatasetManager creates a new dataset manager from a profile manager
+// CreateDatasetManager creates a dataset manager from a profile manager
 func CreateDatasetManager(pm *profile.ZOSMFProfileManager, profileName string) (*ZOSMFDatasetManager, error) {
 	zosmfProfile, err := pm.GetZOSMFProfile(profileName)
 	if err != nil {
@@ -23,7 +24,7 @@ func CreateDatasetManager(pm *profile.ZOSMFProfileManager, profileName string) (
 	return NewDatasetManager(session), nil
 }
 
-// CreateDatasetManagerDirect creates a dataset manager directly with connection parameters
+// CreateDatasetManagerDirect creates a dataset manager with connection details
 func CreateDatasetManagerDirect(host string, port int, user, password string) (*ZOSMFDatasetManager, error) {
 	session, err := profile.CreateSessionDirect(host, port, user, password)
 	if err != nil {
@@ -33,7 +34,7 @@ func CreateDatasetManagerDirect(host string, port int, user, password string) (*
 	return NewDatasetManager(session), nil
 }
 
-// CreateDatasetManagerDirectWithOptions creates a dataset manager with additional options
+// CreateDatasetManagerDirectWithOptions creates a dataset manager with extra options
 func CreateDatasetManagerDirectWithOptions(host string, port int, user, password string, rejectUnauthorized bool, basePath string) (*ZOSMFDatasetManager, error) {
 	session, err := profile.CreateSessionDirectWithOptions(host, port, user, password, rejectUnauthorized, basePath)
 	if err != nil {
@@ -43,7 +44,7 @@ func CreateDatasetManagerDirectWithOptions(host string, port int, user, password
 	return NewDatasetManager(session), nil
 }
 
-// CreateSequentialDataset creates a sequential dataset with default parameters
+// CreateSequentialDataset creates a sequential dataset with defaults
 func (dm *ZOSMFDatasetManager) CreateSequentialDataset(name string) error {
 	request := &CreateDatasetRequest{
 		Name: name,
@@ -53,14 +54,14 @@ func (dm *ZOSMFDatasetManager) CreateSequentialDataset(name string) error {
 			Secondary: 5,
 			Unit:      SpaceUnitTracks,
 		},
-		RecordFormat: RecordFormatFixed,
-		RecordLength: RecordLength80,
-		BlockSize:    BlockSize800,
+		RecordFormat: RecordFormatVariable,
+		RecordLength: RecordLength256,
+		BlockSize:    BlockSize27920,
 	}
 	return dm.CreateDataset(request)
 }
 
-// CreatePartitionedDataset creates a partitioned dataset with default parameters
+// CreatePartitionedDataset creates a partitioned dataset with defaults
 func (dm *ZOSMFDatasetManager) CreatePartitionedDataset(name string) error {
 	request := &CreateDatasetRequest{
 		Name: name,
@@ -71,15 +72,15 @@ func (dm *ZOSMFDatasetManager) CreatePartitionedDataset(name string) error {
 			Unit:      SpaceUnitTracks,
 			Directory: 5,
 		},
-		RecordFormat: RecordFormatFixed,
-		RecordLength: RecordLength80,
-		BlockSize:    BlockSize800,
+		RecordFormat: RecordFormatVariable,
+		RecordLength: RecordLength256,
+		BlockSize:    BlockSize27920,
 		Directory:    5,
 	}
 	return dm.CreateDataset(request)
 }
 
-// CreateDatasetWithOptions creates a dataset with custom parameters
+// CreateDatasetWithOptions creates a dataset with custom settings
 func (dm *ZOSMFDatasetManager) CreateDatasetWithOptions(name string, datasetType DatasetType, space Space, recordFormat RecordFormat, recordLength RecordLength, blockSize BlockSize) error {
 	request := &CreateDatasetRequest{
 		Name:         name,
@@ -90,7 +91,7 @@ func (dm *ZOSMFDatasetManager) CreateDatasetWithOptions(name string, datasetType
 		BlockSize:    blockSize,
 	}
 	if datasetType == DatasetTypePartitioned && space.Directory == 0 {
-		request.Directory = 5 // Default directory blocks for partitioned datasets
+		request.Directory = 5 // Default directory blocks for PDS
 	}
 	return dm.CreateDataset(request)
 }
@@ -108,6 +109,12 @@ func (dm *ZOSMFDatasetManager) UploadText(datasetName, content string) error {
 
 // UploadTextToMember uploads text content to a member in a partitioned dataset
 func (dm *ZOSMFDatasetManager) UploadTextToMember(datasetName, memberName, content string) error {
+	// Basic validation
+	if err := ValidateMemberName(memberName); err != nil {
+		return fmt.Errorf("invalid member name: %w", err)
+	}
+
+	// Create the upload request
 	request := &UploadRequest{
 		DatasetName: datasetName,
 		MemberName:  memberName,
@@ -115,7 +122,92 @@ func (dm *ZOSMFDatasetManager) UploadTextToMember(datasetName, memberName, conte
 		Encoding:    "UTF-8",
 		Replace:     true,
 	}
-	return dm.UploadContent(request)
+
+	// Try the upload with enhanced error handling
+	err := dm.UploadContent(request)
+	if err != nil {
+		// Provide specific guidance for common PDS errors
+		if strings.Contains(err.Error(), "ISRZ002") || strings.Contains(err.Error(), "I/O error") {
+			return fmt.Errorf("PDS directory I/O error for member %s in %s: %w. This typically indicates:\n1. Directory corruption - use ISPF 3.1 or IEBCOPY to repair\n2. Insufficient directory space - reallocate PDS with more directory blocks\n3. Member name conflicts - check for duplicate or invalid names", memberName, datasetName, err)
+		}
+		if strings.Contains(err.Error(), "LMFIND error") {
+			return fmt.Errorf("PDS directory search error for member %s in %s: %w. The PDS directory may need maintenance using ISPF utilities", memberName, datasetName, err)
+		}
+		return err
+	}
+
+	return nil
+}
+
+// UploadTextToMemberWithValidation uploads text content to a member with comprehensive validation and retry logic
+func (dm *ZOSMFDatasetManager) UploadTextToMemberWithValidation(datasetName, memberName, content string) error {
+	// First, validate the member name according to z/OS standards
+	if err := ValidateMemberName(memberName); err != nil {
+		return fmt.Errorf("invalid member name: %w", err)
+	}
+
+	// Check if the PDS exists and get its information
+	exists, err := dm.Exists(datasetName)
+	if err != nil {
+		return fmt.Errorf("failed to check dataset existence: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("dataset %s does not exist", datasetName)
+	}
+
+	// Get dataset information to verify it's a PDS
+	dsInfo, err := dm.GetDataset(datasetName)
+	if err != nil {
+		return fmt.Errorf("failed to get dataset information: %w", err)
+	}
+	
+	// Verify it's a partitioned dataset
+	if dsInfo.Type != "PO" && dsInfo.Type != "PO-E" {
+		return fmt.Errorf("dataset %s is not a partitioned dataset (type: %s)", datasetName, dsInfo.Type)
+	}
+
+	// Try to list members first to ensure directory is accessible
+	_, err = dm.ListMembers(datasetName)
+	if err != nil {
+		// If we can't list members, the directory might be corrupted
+		return fmt.Errorf("PDS directory error for %s: %w. This may indicate directory corruption or insufficient directory space. Consider using IEBCOPY or ISPF to repair the PDS directory", datasetName, err)
+	}
+
+	// Check if member already exists - if so, we're replacing it
+	memberExists := false
+	members, err := dm.ListMembers(datasetName)
+	if err == nil {
+		for _, member := range members.Members {
+			if member.Name == memberName {
+				memberExists = true
+				break
+			}
+		}
+	}
+
+	// Create the upload request with enhanced error handling
+	request := &UploadRequest{
+		DatasetName: datasetName,
+		MemberName:  memberName,
+		Content:     content,
+		Encoding:    "UTF-8",
+		Replace:     true,
+	}
+
+	// Attempt the upload with retry logic for directory issues
+	err = dm.uploadWithRetry(request, memberExists)
+	if err != nil {
+		// Provide specific guidance for common PDS errors
+		if strings.Contains(err.Error(), "ISRZ002") || strings.Contains(err.Error(), "I/O error") {
+			return fmt.Errorf("PDS directory I/O error for member %s in %s: %w. This typically indicates:\n1. Directory corruption - use ISPF 3.1 or IEBCOPY to repair\n2. Insufficient directory space - reallocate PDS with more directory blocks\n3. Member name conflicts - check for duplicate or invalid names", memberName, datasetName, err)
+		}
+		if strings.Contains(err.Error(), "LMFIND error") {
+			return fmt.Errorf("PDS directory search error for member %s in %s: %w. The PDS directory may need maintenance using ISPF utilities", memberName, datasetName, err)
+		}
+		return fmt.Errorf("failed to upload member %s to %s: %w", memberName, datasetName, err)
+	}
+
+	return nil
 }
 
 // DownloadText downloads text content from a dataset
@@ -375,4 +467,107 @@ func CreateSmallSpace(unit SpaceUnit) Space {
 		Unit:      unit,
 		Directory: 2, // For partitioned datasets
 	}
+}
+
+// CopyMemberToSameDataset copies a member within the same partitioned dataset
+func (dm *ZOSMFDatasetManager) CopyMemberToSameDataset(datasetName, sourceMember, targetMember string) error {
+	return dm.CopyMember(datasetName, sourceMember, datasetName, targetMember)
+}
+
+// CopyMemberWithSameName copies a member from one dataset to another with the same member name
+func (dm *ZOSMFDatasetManager) CopyMemberWithSameName(sourceDataset, targetDataset, memberName string) error {
+	return dm.CopyMember(sourceDataset, memberName, targetDataset, memberName)
+}
+
+// uploadWithRetry attempts to upload content with retry logic for PDS directory issues
+func (dm *ZOSMFDatasetManager) uploadWithRetry(request *UploadRequest, memberExists bool) error {
+	const maxRetries = 3
+	const retryDelay = time.Second * 2
+
+	var lastError error
+	
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		err := dm.UploadContent(request)
+		if err == nil {
+			return nil // Success
+		}
+		
+		lastError = err
+		
+		// Check if this is a retryable error
+		errorStr := strings.ToLower(err.Error())
+		isRetryable := strings.Contains(errorStr, "isrz002") ||
+			strings.Contains(errorStr, "i/o error") ||
+			strings.Contains(errorStr, "lmfind error") ||
+			strings.Contains(errorStr, "directory") ||
+			strings.Contains(errorStr, "timeout") ||
+			strings.Contains(errorStr, "connection")
+		
+		if !isRetryable {
+			// Non-retryable error, fail immediately
+			return err
+		}
+		
+		if attempt < maxRetries {
+			// Wait before retry, with exponential backoff
+			waitTime := time.Duration(attempt) * retryDelay
+			time.Sleep(waitTime)
+		}
+	}
+	
+	return fmt.Errorf("upload failed after %d attempts: %w", maxRetries, lastError)
+}
+
+// CreatePDSWithDirectorySpace creates a PDS with adequate directory space to avoid I/O errors
+func (dm *ZOSMFDatasetManager) CreatePDSWithDirectorySpace(name string, directoryBlocks int) error {
+	if directoryBlocks < 5 {
+		directoryBlocks = 10 // Minimum recommended directory blocks
+	}
+	
+	request := &CreateDatasetRequest{
+		Name: name,
+		Type: DatasetTypePartitioned,
+		Space: Space{
+			Primary:   20, // Larger primary space
+			Secondary: 10,
+			Unit:      SpaceUnitTracks,
+			Directory: directoryBlocks,
+		},
+		RecordFormat: RecordFormatVariable,
+		RecordLength: RecordLength256,
+		BlockSize:    BlockSize27920,
+		Directory:    directoryBlocks,
+	}
+	return dm.CreateDataset(request)
+}
+
+// CheckPDSDirectoryHealth checks if a PDS directory is healthy and accessible
+func (dm *ZOSMFDatasetManager) CheckPDSDirectoryHealth(datasetName string) error {
+	// First check if dataset exists
+	exists, err := dm.Exists(datasetName)
+	if err != nil {
+		return fmt.Errorf("failed to check dataset existence: %w", err)
+	}
+	if !exists {
+		return fmt.Errorf("dataset %s does not exist", datasetName)
+	}
+
+	// Get dataset information
+	dsInfo, err := dm.GetDataset(datasetName)
+	if err != nil {
+		return fmt.Errorf("failed to get dataset information: %w", err)
+	}
+	
+	// Verify it's a PDS
+	if dsInfo.Type != "PO" && dsInfo.Type != "PO-E" {
+		return fmt.Errorf("dataset %s is not a partitioned dataset (type: %s)", datasetName, dsInfo.Type)
+	}
+
+	// Try to list members to test directory accessibility
+	_, err = dm.ListMembers(datasetName)
+	if err != nil {
+		return fmt.Errorf("PDS directory is not accessible: %w", err)
+	}
+
+	return nil
 }

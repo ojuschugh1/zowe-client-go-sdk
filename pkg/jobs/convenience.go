@@ -8,7 +8,16 @@ import (
 	"github.com/ojuschugh1/zowe-client-go-sdk/pkg/profile"
 )
 
-// CreateJobManager creates a new job manager from a profile manager
+// parseCorrelator parses "jobname:jobid" into separate parts
+func parseCorrelator(correlator string) (jobName, jobID string, err error) {
+	parts := strings.Split(correlator, ":")
+	if len(parts) != 2 {
+		return "", "", fmt.Errorf("correlator must be in format 'jobname:jobid', got: %s", correlator)
+	}
+	return parts[0], parts[1], nil
+}
+
+// CreateJobManager creates a job manager from a profile manager
 func CreateJobManager(pm *profile.ZOSMFProfileManager, profileName string) (*ZOSMFJobManager, error) {
 	zosmfProfile, err := pm.GetZOSMFProfile(profileName)
 	if err != nil {
@@ -23,7 +32,7 @@ func CreateJobManager(pm *profile.ZOSMFProfileManager, profileName string) (*ZOS
 	return NewJobManager(session), nil
 }
 
-// CreateJobManagerDirect creates a job manager directly with connection parameters
+// CreateJobManagerDirect creates a job manager with connection details
 func CreateJobManagerDirect(host string, port int, user, password string) (*ZOSMFJobManager, error) {
 	session, err := profile.CreateSessionDirect(host, port, user, password)
 	if err != nil {
@@ -33,7 +42,7 @@ func CreateJobManagerDirect(host string, port int, user, password string) (*ZOSM
 	return NewJobManager(session), nil
 }
 
-// CreateJobManagerDirectWithOptions creates a job manager with additional options
+// CreateJobManagerDirectWithOptions creates a job manager with extra options
 func CreateJobManagerDirectWithOptions(host string, port int, user, password string, rejectUnauthorized bool, basePath string) (*ZOSMFJobManager, error) {
 	session, err := profile.CreateSessionDirectWithOptions(host, port, user, password, rejectUnauthorized, basePath)
 	if err != nil {
@@ -53,6 +62,19 @@ func (jm *ZOSMFJobManager) SubmitJobStatement(jclStatement string) (*SubmitJobRe
 
 // SubmitJobFromDataset submits a job from a dataset
 func (jm *ZOSMFJobManager) SubmitJobFromDataset(dataset string, volume string) (*SubmitJobResponse, error) {
+	// Ensure dataset name is properly formatted for z/OSMF
+	// Remove any existing "//" prefix to ensure consistency
+	dataset = strings.TrimPrefix(dataset, "//")
+	
+	// z/OSMF automatically adds the user prefix, so we should use relative dataset names
+	// If the dataset name starts with the user ID, remove it to avoid duplication
+	// This is a common pattern in z/OSMF APIs
+	session := jm.session.(*profile.Session)
+	userID := session.User
+	if strings.HasPrefix(dataset, userID+".") {
+		dataset = strings.TrimPrefix(dataset, userID+".")
+	}
+	
 	request := &SubmitJobRequest{
 		JobDataSet: dataset,
 		Volume:     volume,
@@ -138,8 +160,46 @@ func (jm *ZOSMFJobManager) GetJobsByStatus(status string, maxJobs int) (*JobList
 
 // GetJobOutput retrieves the output of a completed job
 func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, error) {
+	var jobName, jobID string
+	var err error
+	
+	// Check if it's already in correlator format (jobname:jobid)
+	if strings.Contains(correlator, ":") {
+		// Parse correlator to get jobname and jobid
+		jobName, jobID, err = parseCorrelator(correlator)
+		if err != nil {
+			return nil, fmt.Errorf("invalid correlator format: %w", err)
+		}
+	} else {
+		// If it's just a job ID, we need to find the job first
+		jobFilter := &JobFilter{
+			JobID: correlator,
+			MaxJobs: 100,
+		}
+		
+		jobList, err := jm.ListJobs(jobFilter)
+		if err != nil {
+			return nil, fmt.Errorf("failed to find job with ID %s: %w", correlator, err)
+		}
+		
+		// Find the job with the specified job ID
+		found := false
+		for _, job := range jobList.Jobs {
+			if job.JobID == correlator {
+				jobName = job.JobName
+				jobID = job.JobID
+				found = true
+				break
+			}
+		}
+		
+		if !found {
+			return nil, fmt.Errorf("job with ID %s not found", correlator)
+		}
+	}
+
 	// Get spool files
-	spoolFiles, err := jm.GetSpoolFiles(correlator)
+	spoolFiles, err := jm.GetSpoolFiles(jobName, jobID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get spool files: %w", err)
 	}
@@ -147,7 +207,7 @@ func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, e
 	// Get content for each spool file
 	output := make(map[string]string)
 	for _, spoolFile := range spoolFiles {
-		content, err := jm.GetSpoolFileContent(correlator, spoolFile.ID)
+		content, err := jm.GetSpoolFileContent(jobName, jobID, spoolFile.ID)
 		if err != nil {
 			// Log error but continue with other files
 			continue
@@ -160,8 +220,46 @@ func (jm *ZOSMFJobManager) GetJobOutput(correlator string) (map[string]string, e
 
 // GetJobOutputByDDName retrieves the output of a specific DD name for a job
 func (jm *ZOSMFJobManager) GetJobOutputByDDName(correlator, ddName string) (string, error) {
+	var jobName, jobID string
+	var err error
+	
+	// Check if it's already in correlator format (jobname:jobid)
+	if strings.Contains(correlator, ":") {
+		// Parse correlator to get jobname and jobid
+		jobName, jobID, err = parseCorrelator(correlator)
+		if err != nil {
+			return "", fmt.Errorf("invalid correlator format: %w", err)
+		}
+	} else {
+		// If it's just a job ID, we need to find the job first
+		jobFilter := &JobFilter{
+			JobID: correlator,
+			MaxJobs: 100,
+		}
+		
+		jobList, err := jm.ListJobs(jobFilter)
+		if err != nil {
+			return "", fmt.Errorf("failed to find job with ID %s: %w", correlator, err)
+		}
+		
+		// Find the job with the specified job ID
+		found := false
+		for _, job := range jobList.Jobs {
+			if job.JobID == correlator {
+				jobName = job.JobName
+				jobID = job.JobID
+				found = true
+				break
+			}
+		}
+		
+		if !found {
+			return "", fmt.Errorf("job with ID %s not found", correlator)
+		}
+	}
+
 	// Get spool files
-	spoolFiles, err := jm.GetSpoolFiles(correlator)
+	spoolFiles, err := jm.GetSpoolFiles(jobName, jobID)
 	if err != nil {
 		return "", fmt.Errorf("failed to get spool files: %w", err)
 	}
@@ -169,7 +267,7 @@ func (jm *ZOSMFJobManager) GetJobOutputByDDName(correlator, ddName string) (stri
 	// Find the spool file with the specified DD name
 	for _, spoolFile := range spoolFiles {
 		if spoolFile.DDName == ddName {
-			content, err := jm.GetSpoolFileContent(correlator, spoolFile.ID)
+			content, err := jm.GetSpoolFileContent(jobName, jobID, spoolFile.ID)
 			if err != nil {
 				return "", fmt.Errorf("failed to get content for DD %s: %w", ddName, err)
 			}
