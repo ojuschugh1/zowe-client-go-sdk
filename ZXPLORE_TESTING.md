@@ -252,8 +252,8 @@ jobs:
 
 ## Support
 
-If you encounter issues:
-1. Check the zXplore documentation
+If you encounter issues: 
+1. Check the zXplore documentation -: https://www.ibm.com/docs/en/zos
 2. Contact zXplore support
 3. Review the SDK documentation
 4. Check the test output for specific error messages
